@@ -340,6 +340,53 @@ body {
   opacity: 0.7;
 }
 
+/* Delete button section */
+.habit-delete-section {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border-color);
+}
+
+.habit-delete-section.detail-view {
+  margin-top: var(--spacing-xl);
+  padding-top: var(--spacing-lg);
+}
+
+.delete-btn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.delete-btn:hover {
+  background: var(--habit-red);
+  color: white;
+  border-color: var(--habit-red);
+  transform: translateY(-1px);
+}
+
+.delete-btn.danger {
+  background: var(--habit-red);
+  color: white;
+  border-color: var(--habit-red);
+}
+
+.delete-btn.danger:hover {
+  background: #e63946;
+  border-color: #e63946;
+}
+
 /* Heatmap */
 .heatmap-container {
   margin: var(--spacing-md) 0;
@@ -392,11 +439,19 @@ body {
   margin-bottom: 8px;
   font-size: 12px;
   color: var(--text-secondary);
+  min-width: max-content;
+  padding: 0 8px; /* Match heatmap padding */
+}
+
+.month-labels::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 .month-labels > div {
   text-align: center;
-  font-weight: 500;
+  font-weight: 600;
+  min-width: 12px; /* Match heatmap cell width */
+  color: var(--text-primary);
 }
 
 /* Heatmap grid */
@@ -405,13 +460,77 @@ body {
   grid-template-columns: repeat(53, 1fr);
   grid-template-rows: repeat(7, 1fr);
   gap: 3px;
-  padding: var(--spacing-sm);
+  padding: 8px;
   background: var(--bg-tertiary);
   border-radius: var(--radius-md);
-  overflow-x: auto;
   min-height: 105px; /* 7 rows × 12px + 6 gaps × 3px + padding */
+  min-width: max-content;
 }
 
+.heatmap-grid::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+/* Heatmap container with synchronized scrolling */
+.heatmap-container {
+  margin: var(--spacing-md) 0;
+}
+
+.heatmap-scroll-container {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -ms-overflow-style: none;
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  /* Show approximately 4 months at a time */
+  max-width: calc(4 * (12px * 4 + 3px * 3) + 16px); /* 4 months + padding */
+  margin: 0 auto; /* Center the container */
+  position: relative;
+  /* Add smooth scrolling */
+  scroll-behavior: smooth;
+}
+
+/* Add scroll indicators */
+.heatmap-scroll-container::before,
+.heatmap-scroll-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.heatmap-scroll-container::before {
+  left: 0;
+  background: linear-gradient(to right, var(--bg-tertiary), transparent);
+}
+
+.heatmap-scroll-container::after {
+  right: 0;
+  background: linear-gradient(to left, var(--bg-tertiary), transparent);
+}
+
+.heatmap-scroll-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.heatmap-scroll-container::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+.heatmap-scroll-container::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.heatmap-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+/* Heatmap cells */
 .heatmap-cell {
   width: 12px;
   height: 12px;
@@ -573,6 +692,33 @@ body {
   color: var(--text-primary);
 }
 
+/* Notifications */
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 10000;
+  font-weight: 500;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  color: white;
+}
+
+.notification-success {
+  background: var(--habit-green);
+}
+
+.notification-error {
+  background: var(--habit-red);
+}
+
+.notification-info {
+  background: var(--habit-blue);
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .main-content {
@@ -602,6 +748,11 @@ body {
     margin: var(--spacing-md);
     max-height: calc(100vh - 2rem);
   }
+  
+  .delete-btn {
+    padding: var(--spacing-sm);
+    font-size: 0.8rem;
+  }
 }
 
 @media (max-width: 480px) {
@@ -622,6 +773,15 @@ body {
   
   .month-labels {
     font-size: 10px;
+  }
+  
+  .habit-delete-section {
+    justify-content: center;
+  }
+  
+  .delete-btn {
+    width: 100%;
+    justify-content: center;
   }
 }
 

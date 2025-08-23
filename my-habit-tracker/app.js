@@ -159,6 +159,70 @@ class HabitKit {
     this.render();
   }
 
+  deleteHabit(habitId) {
+    const habit = this.habits.find(h => h.id === habitId);
+    if (!habit) return;
+
+    // Show confirmation dialog
+    const confirmed = confirm(`Are you sure you want to delete "${habit.name}"?\n\nThis action cannot be undone and will permanently remove all completion data for this habit.`);
+    
+    if (confirmed) {
+      // Remove habit from array
+      this.habits = this.habits.filter(h => h.id !== habitId);
+      this.saveHabits();
+      
+      // If we're viewing this habit's detail, go back to dashboard
+      if (this.currentView === 'detail' && this.selectedHabit && this.selectedHabit.id === habitId) {
+        this.showDashboard();
+      } else {
+        this.render();
+      }
+      
+      // Show success message
+      this.showNotification(`Habit "${habit.name}" has been deleted successfully.`, 'success');
+    }
+  }
+
+  showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    
+    // Style the notification
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: ${type === 'success' ? 'var(--habit-green)' : type === 'error' ? 'var(--habit-red)' : 'var(--habit-blue)'};
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 10000;
+      font-weight: 500;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Animate in
+    setTimeout(() => {
+      notification.style.transform = 'translateX(0)';
+    }, 100);
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+      notification.style.transform = 'translateX(100%)';
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 300);
+    }, 3000);
+  }
+
   // GitHub-style heatmap rendering
   renderHeatmap(habit, isLarge = false) {
     const container = document.createElement('div');
@@ -198,7 +262,11 @@ class HabitKit {
     header.appendChild(legend);
     container.appendChild(header);
     
-    // Month labels (X-axis)
+    // Create synchronized scrolling container
+    const scrollContainer = document.createElement('div');
+    scrollContainer.className = 'heatmap-scroll-container';
+    
+    // Month labels (X-axis) - now inside scroll container
     const monthLabels = document.createElement('div');
     monthLabels.className = 'month-labels';
     monthLabels.style.cssText = `
@@ -208,6 +276,7 @@ class HabitKit {
       margin-bottom: 8px;
       font-size: 12px;
       color: var(--text-secondary);
+      min-width: max-content;
     `;
     
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -218,12 +287,11 @@ class HabitKit {
       monthLabel.textContent = months[i];
       monthLabel.style.gridColumn = `${pos + 1} / span 4`;
       monthLabel.style.textAlign = 'center';
+      monthLabel.style.fontWeight = '600';
       monthLabels.appendChild(monthLabel);
     });
     
-    container.appendChild(monthLabels);
-    
-    // Main heatmap grid
+    // Main heatmap grid - now inside scroll container
     const grid = document.createElement('div');
     grid.className = 'heatmap-grid';
     grid.style.cssText = `
@@ -234,7 +302,7 @@ class HabitKit {
       padding: 8px;
       background: var(--bg-tertiary);
       border-radius: 6px;
-      overflow-x: auto;
+      min-width: max-content;
     `;
     
     // Generate 53 weeks × 7 days grid
@@ -294,8 +362,46 @@ class HabitKit {
       }
     }
     
-    container.appendChild(grid);
+    // Add both month labels and grid to scroll container
+    scrollContainer.appendChild(monthLabels);
+    scrollContainer.appendChild(grid);
+    
+    // Add scroll container to main container
+    container.appendChild(scrollContainer);
+    
+    // Auto-scroll to current month after a short delay to ensure rendering
+    setTimeout(() => {
+      this.scrollToCurrentMonth(scrollContainer);
+    }, 100);
+    
     return container;
+  }
+
+  // Scroll to current month for better UX
+  scrollToCurrentMonth(scrollContainer) {
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    
+    // Calculate scroll position to center current month
+    // Each month spans roughly 4-5 weeks, so we'll center on the current month
+    const monthPositions = [0, 4, 8, 13, 17, 22, 26, 30, 35, 39, 43, 47];
+    const currentMonthPosition = monthPositions[currentMonth];
+    
+    if (currentMonthPosition !== undefined) {
+      // Calculate scroll position to show current month in the center
+      // We want to show 4 months, so center the current month
+      const cellWidth = 12; // Width of each cell
+      const gap = 3; // Gap between cells
+      const monthWidth = (cellWidth + gap) * 4; // Width of 4 weeks
+      
+      // Calculate scroll position to center current month
+      const scrollPosition = Math.max(0, (currentMonthPosition * (cellWidth + gap)) - (monthWidth / 2));
+      
+      scrollContainer.scrollTo({
+        left: scrollPosition,
+        behavior: 'smooth'
+      });
+    }
   }
 
   getHeatmapColor(level, habitColor) {
@@ -414,39 +520,102 @@ class HabitKit {
     // Header
     const header = document.createElement('header');
     header.className = 'header';
-    header.innerHTML = `
-      <div class="header-content">
-        <h1>HabitKit</h1>
-        <button class="theme-toggle" onclick="app.toggleTheme()">
-          <span class="icon">${this.isDarkMode ? '☀️' : '🌙'}</span>
-          <span>${this.isDarkMode ? 'Light' : 'Dark'}</span>
-        </button>
-      </div>
-    `;
+    
+    const headerContent = document.createElement('div');
+    headerContent.className = 'header-content';
+    
+    const title = document.createElement('h1');
+    title.textContent = 'HabitKit';
+    
+    const themeToggle = document.createElement('button');
+    themeToggle.className = 'theme-toggle';
+    themeToggle.onclick = () => this.toggleTheme();
+    
+    const icon = document.createElement('span');
+    icon.className = 'icon';
+    icon.textContent = this.isDarkMode ? '☀️' : '🌙';
+    
+    const toggleText = document.createElement('span');
+    toggleText.textContent = this.isDarkMode ? 'Light' : 'Dark';
+    
+    themeToggle.appendChild(icon);
+    themeToggle.appendChild(toggleText);
+    
+    headerContent.appendChild(title);
+    headerContent.appendChild(themeToggle);
+    header.appendChild(headerContent);
     
     // Habit form
     const form = document.createElement('div');
     form.className = 'habit-form';
-    form.innerHTML = `
-      <h3 class="form-title">Add New Habit</h3>
-      <div class="form-grid">
-        <div class="form-group">
-          <label for="habit-name">Habit Name</label>
-          <input type="text" id="habit-name" placeholder="e.g., Walk around the block" required>
-        </div>
-        <div class="form-group">
-          <label for="habit-theme">Theme</label>
-          <select id="habit-theme">
-            <option value="green">Green</option>
-            <option value="purple">Purple</option>
-            <option value="red">Red</option>
-            <option value="orange">Orange</option>
-            <option value="blue">Blue</option>
-          </select>
-        </div>
-        <button class="form-submit" onclick="app.handleAddHabit()">Add Habit</button>
-      </div>
-    `;
+    
+    const formTitle = document.createElement('h3');
+    formTitle.className = 'form-title';
+    formTitle.textContent = 'Add New Habit';
+    
+    const formGrid = document.createElement('div');
+    formGrid.className = 'form-grid';
+    
+    // Name input group
+    const nameGroup = document.createElement('div');
+    nameGroup.className = 'form-group';
+    
+    const nameLabel = document.createElement('label');
+    nameLabel.setAttribute('for', 'habit-name');
+    nameLabel.textContent = 'Habit Name';
+    
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.id = 'habit-name';
+    nameInput.placeholder = 'e.g., Walk around the block';
+    nameInput.required = true;
+    
+    nameGroup.appendChild(nameLabel);
+    nameGroup.appendChild(nameInput);
+    
+    // Theme select group
+    const themeGroup = document.createElement('div');
+    themeGroup.className = 'form-group';
+    
+    const themeLabel = document.createElement('label');
+    themeLabel.setAttribute('for', 'habit-theme');
+    themeLabel.textContent = 'Theme';
+    
+    const themeSelect = document.createElement('select');
+    themeSelect.id = 'habit-theme';
+    
+    const themes = ['green', 'purple', 'red', 'orange', 'blue'];
+    themes.forEach(theme => {
+      const option = document.createElement('option');
+      option.value = theme;
+      option.textContent = theme.charAt(0).toUpperCase() + theme.slice(1);
+      themeSelect.appendChild(option);
+    });
+    
+    themeGroup.appendChild(themeLabel);
+    themeGroup.appendChild(themeSelect);
+    
+    // Submit button
+    const submitBtn = document.createElement('button');
+    submitBtn.className = 'form-submit';
+    submitBtn.textContent = 'Add Habit';
+    submitBtn.onclick = () => this.handleAddHabit();
+    
+    // Add form submission handling
+    const formElement = document.createElement('form');
+    formElement.onsubmit = (e) => {
+      e.preventDefault();
+      this.handleAddHabit();
+    };
+    
+    formGrid.appendChild(nameGroup);
+    formGrid.appendChild(themeGroup);
+    formGrid.appendChild(submitBtn);
+    
+    formElement.appendChild(formGrid);
+    
+    form.appendChild(formTitle);
+    form.appendChild(formElement);
     
     // Habits grid
     const habitsGrid = document.createElement('div');
@@ -513,8 +682,21 @@ class HabitKit {
     // Heatmap
     const heatmap = this.renderHeatmap(habit, false);
     
+    // Delete button at bottom right
+    const deleteSection = document.createElement('div');
+    deleteSection.className = 'habit-delete-section';
+    
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'delete-btn';
+    deleteBtn.innerHTML = '🗑️ Delete Habit';
+    deleteBtn.title = 'Delete this habit permanently';
+    deleteBtn.onclick = () => this.deleteHabit(habit.id);
+    
+    deleteSection.appendChild(deleteBtn);
+    
     card.appendChild(header);
     card.appendChild(heatmap);
+    card.appendChild(deleteSection);
     
     return card;
   }
@@ -526,18 +708,37 @@ class HabitKit {
     // Header with back button
     const header = document.createElement('header');
     header.className = 'header';
-    header.innerHTML = `
-      <div class="header-content">
-        <button class="action-btn" onclick="app.showDashboard()" style="margin-right: 16px;">
-          ← Back
-        </button>
-        <h1>${habit.name}</h1>
-        <button class="theme-toggle" onclick="app.toggleTheme()">
-          <span class="icon">${this.isDarkMode ? '☀️' : '🌙'}</span>
-          <span>${this.isDarkMode ? 'Light' : 'Dark'}</span>
-        </button>
-      </div>
-    `;
+    
+    const headerContent = document.createElement('div');
+    headerContent.className = 'header-content';
+    
+    const backBtn = document.createElement('button');
+    backBtn.className = 'action-btn';
+    backBtn.textContent = '← Back';
+    backBtn.style.marginRight = '16px';
+    backBtn.onclick = () => this.showDashboard();
+    
+    const title = document.createElement('h1');
+    title.textContent = habit.name;
+    
+    const themeToggle = document.createElement('button');
+    themeToggle.className = 'theme-toggle';
+    themeToggle.onclick = () => this.toggleTheme();
+    
+    const icon = document.createElement('span');
+    icon.className = 'icon';
+    icon.textContent = this.isDarkMode ? '☀️' : '🌙';
+    
+    const toggleText = document.createElement('span');
+    toggleText.textContent = this.isDarkMode ? 'Light' : 'Dark';
+    
+    themeToggle.appendChild(icon);
+    themeToggle.appendChild(toggleText);
+    
+    headerContent.appendChild(backBtn);
+    headerContent.appendChild(title);
+    headerContent.appendChild(themeToggle);
+    header.appendChild(headerContent);
     
     // Large heatmap
     const heatmapSection = document.createElement('div');
@@ -548,27 +749,82 @@ class HabitKit {
     const stats = this.getHabitStats(habit);
     const statsSection = document.createElement('div');
     statsSection.className = 'stats-section';
-    statsSection.innerHTML = `
-      <h3 class="section-title">Statistics</h3>
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value">${stats.total}</div>
-          <div class="stat-label">Total Completions</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">${stats.avgPerWeek.toFixed(1)}</div>
-          <div class="stat-label">Per Week</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">${stats.longestStreak}</div>
-          <div class="stat-label">Longest Streak</div>
-        </div>
-      </div>
-    `;
+    
+    const sectionTitle = document.createElement('h3');
+    sectionTitle.className = 'section-title';
+    sectionTitle.textContent = 'Statistics';
+    
+    const statsGrid = document.createElement('div');
+    statsGrid.className = 'stats-grid';
+    
+    // Total completions stat
+    const totalStat = document.createElement('div');
+    totalStat.className = 'stat-card';
+    
+    const totalValue = document.createElement('div');
+    totalValue.className = 'stat-value';
+    totalValue.textContent = stats.total;
+    
+    const totalLabel = document.createElement('div');
+    totalLabel.className = 'stat-label';
+    totalLabel.textContent = 'Total Completions';
+    
+    totalStat.appendChild(totalValue);
+    totalStat.appendChild(totalLabel);
+    
+    // Per week stat
+    const weekStat = document.createElement('div');
+    weekStat.className = 'stat-card';
+    
+    const weekValue = document.createElement('div');
+    weekValue.className = 'stat-value';
+    weekValue.textContent = stats.avgPerWeek.toFixed(1);
+    
+    const weekLabel = document.createElement('div');
+    weekLabel.className = 'stat-label';
+    weekLabel.textContent = 'Per Week';
+    
+    weekStat.appendChild(weekValue);
+    weekStat.appendChild(weekLabel);
+    
+    // Longest streak stat
+    const streakStat = document.createElement('div');
+    streakStat.className = 'stat-card';
+    
+    const streakValue = document.createElement('div');
+    streakValue.className = 'stat-value';
+    streakValue.textContent = stats.longestStreak;
+    
+    const streakLabel = document.createElement('div');
+    streakLabel.className = 'stat-label';
+    streakLabel.textContent = 'Longest Streak';
+    
+    streakStat.appendChild(streakValue);
+    streakStat.appendChild(streakLabel);
+    
+    statsGrid.appendChild(totalStat);
+    statsGrid.appendChild(weekStat);
+    statsGrid.appendChild(streakStat);
+    
+    statsSection.appendChild(sectionTitle);
+    statsSection.appendChild(statsGrid);
+    
+    // Delete button in detail view
+    const deleteSection = document.createElement('div');
+    deleteSection.className = 'habit-delete-section detail-view';
+    
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'delete-btn danger';
+    deleteBtn.innerHTML = '🗑️ Delete Habit';
+    deleteBtn.title = 'Delete this habit permanently';
+    deleteBtn.onclick = () => this.deleteHabit(habit.id);
+    
+    deleteSection.appendChild(deleteBtn);
     
     container.appendChild(header);
     container.appendChild(heatmapSection);
     container.appendChild(statsSection);
+    container.appendChild(deleteSection);
     
     return container;
   }
@@ -602,18 +858,38 @@ class HabitKit {
 
   // Event handlers
   handleAddHabit() {
+    console.log('handleAddHabit called'); // Debug log
+    
     const nameInput = document.getElementById('habit-name');
     const themeSelect = document.getElementById('habit-theme');
+    
+    if (!nameInput || !themeSelect) {
+      console.error('Form elements not found:', { nameInput, themeSelect });
+      return;
+    }
     
     const name = nameInput.value.trim();
     const theme = themeSelect.value;
     
-    if (!name) return;
+    console.log('Form values:', { name, theme }); // Debug log
+    
+    if (!name) {
+      console.log('No name provided, returning');
+      return;
+    }
+    
+    console.log('Adding habit:', { name, theme }); // Debug log
     
     this.addHabit(name, `Track your progress with ${name.toLowerCase()}`, theme);
     
+    // Reset form
     nameInput.value = '';
     themeSelect.value = 'green';
+    
+    // Focus back to name input for better UX
+    nameInput.focus();
+    
+    console.log('Habit added successfully'); // Debug log
   }
 
   toggleTheme() {
