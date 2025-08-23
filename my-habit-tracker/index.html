@@ -5,55 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Habit Tracker">
-  <meta name="theme-color" content="#4caf50">
-  <meta name="msapplication-TileColor" content="#4caf50">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="HabitKit">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="msapplication-TileColor" content="#0d1117">
   <meta name="format-detection" content="telephone=no">
-  <title>My Minimalist Habit Tracker</title>
+  <title>HabitKit - GitHub-Style Habit Tracker</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
+  <!-- Chart.js for analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body>
-  <main id="app">
-    <div class="header">
-      <h1>Habit Tracker</h1>
-      <div class="theme-toggle-container">
-        <input type="checkbox" id="theme-toggle" class="theme-toggle-input">
-        <label for="theme-toggle" class="theme-toggle-label">
-          <span class="toggle-slider">
-            <span class="toggle-icon">🌙</span>
-            <span class="toggle-icon">☀️</span>
-          </span>
-        </label>
-      </div>
-    </div>
-    <form class="habit-form">
-      <div class="form-row">
-        <input type="text" name="habitName" placeholder="New habit name..." required>
-        <input type="color" name="habitColor" value="#4caf50">
-        <button type="submit">Add</button>
-      </div>
-    </form>
-    <!-- Habit cards will be rendered here by JS -->
-  </main>
-  <script src="app.js"></script>
-  <script>
-    // Register service worker for PWA functionality
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(registration => {
-            console.log('SW registered: ', registration);
-          })
-          .catch(registrationError => {
-            console.log('SW registration failed: ', registrationError);
-          });
-      });
-    }
-  </script>
+<body class="dark-mode">
+  <div id="root"></div>
+  <script src="app.js" type="module"></script>
 </body>
 </html> 

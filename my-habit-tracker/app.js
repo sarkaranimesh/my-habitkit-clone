@@ -1,581 +1,634 @@
-// Mobile-Optimized Minimalist Habit Tracker - IndexedDB Persistence + Export/Import + Dark Mode
+// HabitKit - GitHub-Style Habit Tracker with Contribution Heatmaps
+// Following GitHub's exact schema: 52 weeks × 7 weekdays
 
-const DAYS_IN_HEATMAP = 56; // 8 weeks
-const DB_NAME = 'habitkit-db';
-const DB_STORE = 'habits';
-
-// Mobile detection
-const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
-                 ('ontouchstart' in window) || 
-                 (navigator.maxTouchPoints > 0);
-
-// Theme management
-function initTheme() {
-  const savedTheme = localStorage.getItem('habit-tracker-theme');
-  const themeToggle = document.getElementById('theme-toggle');
-  
-  if (savedTheme === 'dark') {
-    document.body.classList.add('dark-mode');
-    if (themeToggle) themeToggle.checked = true;
-  } else {
-    document.body.classList.remove('dark-mode');
-    if (themeToggle) themeToggle.checked = false;
+class HabitKit {
+  constructor() {
+    this.habits = [];
+    this.currentView = 'dashboard'; // 'dashboard' or 'detail'
+    this.selectedHabit = null;
+    this.isDarkMode = true;
+    
+    this.init();
   }
-}
 
-function toggleTheme() {
-  console.log('toggleTheme function called');
-  const themeToggle = document.getElementById('theme-toggle');
-  const isDark = themeToggle.checked;
-  console.log('Toggle checked state:', isDark);
-  
-  if (isDark) {
-    document.body.classList.add('dark-mode');
-    localStorage.setItem('habit-tracker-theme', 'dark');
-    console.log('Switched to dark mode');
-  } else {
-    document.body.classList.remove('dark-mode');
-    localStorage.setItem('habit-tracker-theme', 'light');
-    console.log('Switched to light mode');
+  init() {
+    this.loadHabits();
+    this.setupEventListeners();
+    this.render();
   }
-}
 
-function updateThemeIcon(icon) {
-  // This function is no longer needed with the new toggle design
-  // The icons are now handled by CSS
-}
+  // GitHub-style heatmap utilities
+  getWeekNumber(date) {
+    const start = new Date(date.getFullYear(), 0, 1);
+    const days = Math.floor((date - start) / (24 * 60 * 60 * 1000));
+    return Math.ceil((days + start.getDay() + 1) / 7);
+  }
 
-// Mobile-specific utilities
-function addTouchFeedback(element) {
-  if (!isMobile) return;
-  
-  element.addEventListener('touchstart', function() {
-    this.style.transform = 'scale(0.98)';
-  }, { passive: true });
-  
-  element.addEventListener('touchend', function() {
-    this.style.transform = '';
-  }, { passive: true });
-}
+  getDayOfWeek(date) {
+    // GitHub uses Monday = 0, Sunday = 6
+    const day = date.getDay();
+    return day === 0 ? 6 : day - 1;
+  }
 
-function preventZoomOnInput() {
-  if (!isMobile) return;
-  
-  const inputs = document.querySelectorAll('input[type="text"]');
-  inputs.forEach(input => {
-    input.addEventListener('focus', function() {
-      // Prevent zoom on iOS
-      this.style.fontSize = '16px';
+  getDateFromWeekAndDay(week, dayOfWeek, year) {
+    const start = new Date(year, 0, 1);
+    const firstMonday = new Date(start);
+    const dayOffset = start.getDay();
+    const mondayOffset = dayOffset === 0 ? 6 : dayOffset - 1;
+    
+    firstMonday.setDate(start.getDate() - mondayOffset);
+    const targetDate = new Date(firstMonday);
+    targetDate.setDate(firstMonday.getDate() + (week * 7) + dayOfWeek);
+    
+    return targetDate;
+  }
+
+  getCompletionLevel(habit, date) {
+    const dateStr = date.toISOString().slice(0, 10);
+    const completed = habit.completions[dateStr];
+    
+    if (!completed) return 0;
+    
+    // Calculate intensity based on surrounding days (like GitHub)
+    let intensity = 1;
+    const weekStart = new Date(date);
+    weekStart.setDate(date.getDate() - date.getDay());
+    
+    for (let i = 0; i < 7; i++) {
+      const checkDate = new Date(weekStart);
+      checkDate.setDate(weekStart.getDate() + i);
+      const checkStr = checkDate.toISOString().slice(0, 10);
+      if (habit.completions[checkStr]) intensity++;
+    }
+    
+    return Math.min(intensity, 4); // 0-4 levels like GitHub
+  }
+
+  // Data management
+  loadHabits() {
+    const saved = localStorage.getItem('habitkit-habits');
+    if (saved) {
+      this.habits = JSON.parse(saved);
+    } else {
+      // Default habits with GitHub-style colors
+      this.habits = [
+        {
+          id: 1,
+          name: 'Walk around the block',
+          description: 'Go for a short walk to clear the mind',
+          color: '#39d353', // GitHub green
+          theme: 'green',
+          completions: {}
+        },
+        {
+          id: 2,
+          name: 'Learn Norwegian',
+          description: 'Practice Norwegian language skills',
+          color: '#a371f7', // GitHub purple
+          theme: 'purple',
+          completions: {}
+        },
+        {
+          id: 3,
+          name: 'Eat a piece of fruit',
+          description: 'Consume one serving of fruit',
+          color: '#f85149', // GitHub red
+          theme: 'red',
+          completions: {}
+        },
+        {
+          id: 4,
+          name: 'Stretch for 5 minutes',
+          description: 'Do basic stretching exercises',
+          color: '#ffa657', // GitHub orange
+          theme: 'orange',
+          completions: {}
+        },
+        {
+          id: 5,
+          name: 'Deep breathing exercise',
+          description: 'Practice mindful breathing',
+          color: '#58a6ff', // GitHub blue
+          theme: 'blue',
+          completions: {}
+        }
+      ];
+      this.saveHabits();
+    }
+  }
+
+  saveHabits() {
+    localStorage.setItem('habitkit-habits', JSON.stringify(this.habits));
+  }
+
+  toggleHabitCompletion(habitId, date) {
+    const habit = this.habits.find(h => h.id === habitId);
+    if (!habit) return;
+
+    const dateStr = date.toISOString().slice(0, 10);
+    if (habit.completions[dateStr]) {
+      delete habit.completions[dateStr];
+    } else {
+      habit.completions[dateStr] = true;
+    }
+    
+    this.saveHabits();
+    this.render();
+  }
+
+  addHabit(name, description, theme) {
+    const themes = {
+      green: '#39d353',
+      purple: '#a371f7',
+      red: '#f85149',
+      orange: '#ffa657',
+      blue: '#58a6ff'
+    };
+
+    const habit = {
+      id: Date.now(),
+      name,
+      description,
+      color: themes[theme] || themes.green,
+      theme,
+      completions: {}
+    };
+
+    this.habits.push(habit);
+    this.saveHabits();
+    this.render();
+  }
+
+  // GitHub-style heatmap rendering
+  renderHeatmap(habit, isLarge = false) {
+    const container = document.createElement('div');
+    container.className = 'heatmap-container';
+    
+    // Header with title and legend
+    const header = document.createElement('div');
+    header.className = 'heatmap-header';
+    
+    const title = document.createElement('div');
+    title.className = 'heatmap-title';
+    title.textContent = isLarge ? 'One year of activity' : 'Activity';
+    
+    const legend = document.createElement('div');
+    legend.className = 'heatmap-legend';
+    
+    const legendTexts = ['Less', 'More'];
+    const legendColors = ['#21262d', '#39d353'];
+    
+    legendTexts.forEach((text, i) => {
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      
+      const color = document.createElement('div');
+      color.className = 'legend-color';
+      color.style.background = legendColors[i];
+      
+      const label = document.createElement('span');
+      label.textContent = text;
+      
+      item.appendChild(color);
+      item.appendChild(label);
+      legend.appendChild(item);
     });
     
-    input.addEventListener('blur', function() {
-      this.style.fontSize = '';
+    header.appendChild(title);
+    header.appendChild(legend);
+    container.appendChild(header);
+    
+    // Month labels (X-axis)
+    const monthLabels = document.createElement('div');
+    monthLabels.className = 'month-labels';
+    monthLabels.style.cssText = `
+      display: grid;
+      grid-template-columns: repeat(53, 1fr);
+      gap: 3px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    `;
+    
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthPositions = [0, 4, 8, 13, 17, 22, 26, 30, 35, 39, 43, 47];
+    
+    monthPositions.forEach((pos, i) => {
+      const monthLabel = document.createElement('div');
+      monthLabel.textContent = months[i];
+      monthLabel.style.gridColumn = `${pos + 1} / span 4`;
+      monthLabel.style.textAlign = 'center';
+      monthLabels.appendChild(monthLabel);
     });
-  });
-}
-
-// Minimal idb helper
-const idb = {
-  async withStore(mode, callback) {
-    return new Promise((resolve, reject) => {
-      const open = indexedDB.open(DB_NAME, 1);
-      open.onupgradeneeded = () => {
-        open.result.createObjectStore(DB_STORE, { keyPath: 'id' });
-      };
-      open.onerror = () => reject(open.error);
-      open.onsuccess = () => {
-        const db = open.result;
-        const tx = db.transaction(DB_STORE, mode);
-        const store = tx.objectStore(DB_STORE);
-        callback(store, tx);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      };
-    });
-  },
-  async getAll() {
-    return new Promise((resolve, reject) => {
-      const open = indexedDB.open(DB_NAME, 1);
-      open.onupgradeneeded = () => {
-        open.result.createObjectStore(DB_STORE, { keyPath: 'id' });
-      };
-      open.onerror = () => reject(open.error);
-      open.onsuccess = () => {
-        const db = open.result;
-        const tx = db.transaction(DB_STORE, 'readonly');
-        const store = tx.objectStore(DB_STORE);
-        const req = store.getAll();
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-      };
-    });
-  },
-  async put(habit) {
-    return this.withStore('readwrite', (store) => store.put(habit));
-  },
-  async delete(id) {
-    return this.withStore('readwrite', (store) => store.delete(id));
-  },
-  async clear() {
-    return this.withStore('readwrite', (store) => store.clear());
+    
+    container.appendChild(monthLabels);
+    
+    // Main heatmap grid
+    const grid = document.createElement('div');
+    grid.className = 'heatmap-grid';
+    grid.style.cssText = `
+      display: grid;
+      grid-template-columns: repeat(53, 1fr);
+      grid-template-rows: repeat(7, 1fr);
+      gap: 3px;
+      padding: 8px;
+      background: var(--bg-tertiary);
+      border-radius: 6px;
+      overflow-x: auto;
+    `;
+    
+    // Generate 53 weeks × 7 days grid
+    const currentYear = new Date().getFullYear();
+    const startDate = new Date(currentYear, 0, 1);
+    
+    // Find the first Monday of the year
+    const firstMonday = new Date(startDate);
+    const dayOffset = startDate.getDay();
+    const mondayOffset = dayOffset === 0 ? 6 : dayOffset - 1;
+    firstMonday.setDate(startDate.getDate() - mondayOffset);
+    
+    for (let week = 0; week < 53; week++) {
+      for (let day = 0; day < 7; day++) {
+        const cell = document.createElement('div');
+        cell.className = 'heatmap-cell';
+        
+        const cellDate = new Date(firstMonday);
+        cellDate.setDate(firstMonday.getDate() + (week * 7) + day);
+        
+        // Skip if date is in the future
+        if (cellDate > new Date()) {
+          cell.style.visibility = 'hidden';
+        } else {
+          const completionLevel = this.getCompletionLevel(habit, cellDate);
+          const cellSize = isLarge ? '16px' : '12px';
+          
+          cell.style.cssText = `
+            width: ${cellSize};
+            height: ${cellSize};
+            border-radius: 2px;
+            background: ${this.getHeatmapColor(completionLevel, habit.color)};
+            transition: all 0.15s ease;
+            cursor: pointer;
+            position: relative;
+          `;
+          
+          // Add click handler
+          cell.addEventListener('click', () => {
+            this.toggleHabitCompletion(habit.id, cellDate);
+          });
+          
+          // Add tooltip
+          const dateStr = cellDate.toISOString().slice(0, 10);
+          const isCompleted = !!habit.completions[dateStr];
+          
+          cell.addEventListener('mouseenter', (e) => {
+            this.showTooltip(e.target, cellDate, isCompleted, habit);
+          });
+          
+          cell.addEventListener('mouseleave', () => {
+            this.hideTooltip();
+          });
+        }
+        
+        grid.appendChild(cell);
+      }
+    }
+    
+    container.appendChild(grid);
+    return container;
   }
-};
 
-function getTodayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
+  getHeatmapColor(level, habitColor) {
+    if (level === 0) return 'var(--heatmap-empty)';
+    
+    // GitHub-style color progression
+    const colors = {
+      green: ['#0e4429', '#006d32', '#26a641', '#39d353'],
+      purple: ['#1a103d', '#4c2889', '#7c3aed', '#a371f7'],
+      red: ['#3d1216', '#7d1814', '#b91c1c', '#f85149'],
+      orange: ['#3d1e00', '#7c2d12', '#ea580c', '#ffa657'],
+      blue: ['#0c2a6d', '#1e40af', '#2563eb', '#58a6ff']
+    };
+    
+    const theme = this.getHabitTheme(habitColor);
+    return colors[theme][level - 1] || colors.green[level - 1];
+  }
 
-function createHabit({ name, color, icon }) {
-  return {
-    id: Date.now() + Math.random().toString(36).slice(2),
-    name,
-    color,
-    icon,
-    completions: {}, // { 'YYYY-MM-DD': true }
-  };
-}
+  getHabitTheme(color) {
+    const colorMap = {
+      '#39d353': 'green',
+      '#a371f7': 'purple',
+      '#f85149': 'red',
+      '#ffa657': 'orange',
+      '#58a6ff': 'blue'
+    };
+    return colorMap[color] || 'green';
+  }
 
-function renderHabits(habits) {
-  const app = document.getElementById('app');
-  // Remove all cards except the form and export/import controls
-  app.querySelectorAll('.habit-card').forEach(card => card.remove());
+  showTooltip(element, date, isCompleted, habit) {
+    const tooltip = document.createElement('div');
+    tooltip.className = 'heatmap-tooltip';
+    
+    const formattedDate = date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    tooltip.textContent = `${formattedDate} - ${isCompleted ? 'Completed' : 'Not completed'}`;
+    tooltip.style.cssText = `
+      position: absolute;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      box-shadow: 0 4px 12px var(--shadow);
+      border: 1px solid var(--border-color);
+      z-index: 1000;
+      pointer-events: none;
+      white-space: nowrap;
+      transform: translateX(-50%);
+    `;
+    
+    document.body.appendChild(tooltip);
+    
+    const rect = element.getBoundingClientRect();
+    tooltip.style.left = `${rect.left + rect.width / 2}px`;
+    tooltip.style.top = `${rect.top - tooltip.offsetHeight - 10}px`;
+    
+    element._tooltip = tooltip;
+  }
 
-  habits.forEach(habit => {
-    const card = document.createElement('section');
+  hideTooltip() {
+    const tooltips = document.querySelectorAll('.heatmap-tooltip');
+    tooltips.forEach(tooltip => tooltip.remove());
+  }
+
+  // Statistics calculation
+  getHabitStats(habit) {
+    const completions = Object.keys(habit.completions).filter(date => {
+      const compDate = new Date(date);
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      return compDate >= oneYearAgo;
+    });
+    
+    const total = completions.length;
+    const weeks = Math.ceil((new Date() - new Date(oneYearAgo)) / (7 * 24 * 60 * 60 * 1000));
+    const avgPerWeek = total / weeks;
+    
+    // Calculate longest streak
+    let currentStreak = 0;
+    let longestStreak = 0;
+    let tempStreak = 0;
+    
+    const sortedDates = completions.sort();
+    for (let i = 0; i < sortedDates.length; i++) {
+      if (i === 0) {
+        tempStreak = 1;
+      } else {
+        const prevDate = new Date(sortedDates[i - 1]);
+        const currDate = new Date(sortedDates[i]);
+        const dayDiff = (currDate - prevDate) / (24 * 60 * 60 * 1000);
+        
+        if (dayDiff === 1) {
+          tempStreak++;
+        } else {
+          longestStreak = Math.max(longestStreak, tempStreak);
+          tempStreak = 1;
+        }
+      }
+    }
+    longestStreak = Math.max(longestStreak, tempStreak);
+    
+    return { total, avgPerWeek, longestStreak };
+  }
+
+  // UI rendering
+  renderDashboard() {
+    const container = document.createElement('div');
+    container.className = 'main-content';
+    
+    // Header
+    const header = document.createElement('header');
+    header.className = 'header';
+    header.innerHTML = `
+      <div class="header-content">
+        <h1>HabitKit</h1>
+        <button class="theme-toggle" onclick="app.toggleTheme()">
+          <span class="icon">${this.isDarkMode ? '☀️' : '🌙'}</span>
+          <span>${this.isDarkMode ? 'Light' : 'Dark'}</span>
+        </button>
+      </div>
+    `;
+    
+    // Habit form
+    const form = document.createElement('div');
+    form.className = 'habit-form';
+    form.innerHTML = `
+      <h3 class="form-title">Add New Habit</h3>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="habit-name">Habit Name</label>
+          <input type="text" id="habit-name" placeholder="e.g., Walk around the block" required>
+        </div>
+        <div class="form-group">
+          <label for="habit-theme">Theme</label>
+          <select id="habit-theme">
+            <option value="green">Green</option>
+            <option value="purple">Purple</option>
+            <option value="red">Red</option>
+            <option value="orange">Orange</option>
+            <option value="blue">Blue</option>
+          </select>
+        </div>
+        <button class="form-submit" onclick="app.handleAddHabit()">Add Habit</button>
+      </div>
+    `;
+    
+    // Habits grid
+    const habitsGrid = document.createElement('div');
+    habitsGrid.className = 'habits-grid';
+    
+    this.habits.forEach(habit => {
+      const card = this.renderHabitCard(habit);
+      habitsGrid.appendChild(card);
+    });
+    
+    container.appendChild(header);
+    container.appendChild(form);
+    container.appendChild(habitsGrid);
+    
+    return container;
+  }
+
+  renderHabitCard(habit) {
+    const card = document.createElement('div');
     card.className = 'habit-card';
     card.style.setProperty('--habit-color', habit.color);
-
+    
     // Header
     const header = document.createElement('div');
     header.className = 'habit-header';
-    if (habit.icon) {
-      const icon = document.createElement('span');
-      icon.className = 'habit-icon';
-      icon.textContent = habit.icon;
-      header.appendChild(icon);
-    }
-    const name = document.createElement('span');
+    
+    const info = document.createElement('div');
+    info.className = 'habit-info';
+    
+    const name = document.createElement('h3');
+    name.className = 'habit-name';
     name.textContent = habit.name;
-    header.appendChild(name);
-    card.appendChild(header);
-
-    // Action button
-    const action = document.createElement('div');
-    action.className = 'habit-action';
-    const today = getTodayISO();
+    
+    const description = document.createElement('p');
+    description.className = 'habit-description';
+    description.textContent = habit.description;
+    
+    info.appendChild(name);
+    info.appendChild(description);
+    
+    const actions = document.createElement('div');
+    actions.className = 'habit-actions';
+    
+    const today = new Date().toISOString().slice(0, 10);
     const completedToday = !!habit.completions[today];
-    const btn = document.createElement('button');
-    btn.textContent = completedToday ? 'Completed' : 'Mark Today';
-    btn.className = completedToday ? 'completed' : '';
-    btn.onclick = async () => {
-      habit.completions[today] = !completedToday;
-      await idb.put(habit);
-      renderHabits(habits);
-    };
     
-    // Add touch feedback for mobile
-    addTouchFeedback(btn);
+    const completeBtn = document.createElement('button');
+    completeBtn.className = `action-btn primary ${completedToday ? 'completed' : ''}`;
+    completeBtn.textContent = completedToday ? '✓ Done' : 'Mark Today';
+    completeBtn.onclick = () => this.toggleHabitCompletion(habit.id, new Date());
     
-    action.appendChild(btn);
-    card.appendChild(action);
-
-    // View toggle
-    const viewToggle = document.createElement('div');
-    viewToggle.className = 'view-toggle';
-    viewToggle.innerHTML = `
-      <button class="view-btn active" data-view="heatmap">Heatmap</button>
-      <button class="view-btn" data-view="calendar">Calendar</button>
-    `;
-    card.appendChild(viewToggle);
-
-    // Heatmap with clickable cells
-    const heatmap = document.createElement('div');
-    heatmap.className = 'heatmap view-container active';
-    const days = [];
-    const now = new Date();
-    for (let i = DAYS_IN_HEATMAP - 1; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(now.getDate() - i);
-      days.push(d.toISOString().slice(0, 10));
-    }
+    const detailBtn = document.createElement('button');
+    detailBtn.className = 'action-btn';
+    detailBtn.innerHTML = '📊';
+    detailBtn.title = 'View Details';
+    detailBtn.onclick = () => this.showHabitDetail(habit);
     
-    days.forEach(dateStr => {
-      const cell = document.createElement('div');
-      cell.className = 'heatmap-cell' + (habit.completions[dateStr] ? ' completed' : '');
-      cell.setAttribute('data-date', dateStr);
-      cell.setAttribute('data-habit-id', habit.id);
-      
-      // Add click handler for marking/unmarking
-      cell.addEventListener('click', async () => {
-        const isCompleted = !!habit.completions[dateStr];
-        habit.completions[dateStr] = !isCompleted;
-        await idb.put(habit);
-        renderHabits(habits);
-      });
-      
-      // Add tooltip for mobile (long press)
-      if (isMobile) {
-        cell.setAttribute('data-completed', habit.completions[dateStr] ? 'true' : 'false');
-        
-        // Add long press handler for mobile
-        let longPressTimer;
-        cell.addEventListener('touchstart', () => {
-          longPressTimer = setTimeout(() => {
-            showDateTooltip(cell, dateStr, habit.completions[dateStr]);
-          }, 500);
-        }, { passive: true });
-        
-        cell.addEventListener('touchend', () => {
-          clearTimeout(longPressTimer);
-        }, { passive: true });
-      }
-      
-      // Add hover tooltip for desktop
-      if (!isMobile) {
-        cell.addEventListener('mouseenter', () => {
-          showDateTooltip(cell, dateStr, habit.completions[dateStr]);
-        });
-        
-        cell.addEventListener('mouseleave', () => {
-          hideDateTooltip();
-        });
-      }
-      
-      heatmap.appendChild(cell);
-    });
+    actions.appendChild(completeBtn);
+    actions.appendChild(detailBtn);
+    
+    header.appendChild(info);
+    header.appendChild(actions);
+    
+    // Heatmap
+    const heatmap = this.renderHeatmap(habit, false);
+    
+    card.appendChild(header);
     card.appendChild(heatmap);
-
-    // Calendar view
-    const calendar = document.createElement('div');
-    calendar.className = 'calendar view-container';
-    calendar.appendChild(createCalendarView(habit));
-    card.appendChild(calendar);
-
-    // View toggle functionality
-    const viewBtns = viewToggle.querySelectorAll('.view-btn');
-    const viewContainers = card.querySelectorAll('.view-container');
     
-    viewBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const view = btn.dataset.view;
-        
-        // Update button states
-        viewBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        
-        // Update container visibility
-        viewContainers.forEach(container => {
-          container.classList.remove('active');
-          if (container.classList.contains(view)) {
-            container.classList.add('active');
-          }
-        });
-      });
-    });
-
-    app.appendChild(card);
-  });
-}
-
-// Tooltip functions for date display
-function showDateTooltip(element, dateStr, isCompleted) {
-  const date = new Date(dateStr);
-  const formattedDate = date.toLocaleDateString('en-US', { 
-    weekday: 'short', 
-    month: 'short', 
-    day: 'numeric',
-    year: 'numeric'
-  });
-  
-  const tooltip = document.createElement('div');
-  tooltip.className = 'date-tooltip';
-  tooltip.textContent = `${formattedDate} - ${isCompleted ? 'Completed' : 'Not completed'}`;
-  tooltip.style.position = 'absolute';
-  tooltip.style.background = 'rgba(0, 0, 0, 0.8)';
-  tooltip.style.color = 'white';
-  tooltip.style.padding = '0.5rem';
-  tooltip.style.borderRadius = '0.5rem';
-  tooltip.style.fontSize = '0.875rem';
-  tooltip.style.zIndex = '1000';
-  tooltip.style.pointerEvents = 'none';
-  tooltip.style.whiteSpace = 'nowrap';
-  
-  document.body.appendChild(tooltip);
-  
-  // Position tooltip
-  const rect = element.getBoundingClientRect();
-  tooltip.style.left = `${rect.left + rect.width / 2 - tooltip.offsetWidth / 2}px`;
-  tooltip.style.top = `${rect.top - tooltip.offsetHeight - 10}px`;
-  
-  // Store reference for removal
-  element._tooltip = tooltip;
-}
-
-function hideDateTooltip() {
-  const tooltips = document.querySelectorAll('.date-tooltip');
-  tooltips.forEach(tooltip => tooltip.remove());
-}
-
-// Calendar view creation
-function createCalendarView(habit) {
-  const calendarContainer = document.createElement('div');
-  calendarContainer.className = 'calendar-container';
-  
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-  
-  // Create month header
-  const monthHeader = document.createElement('div');
-  monthHeader.className = 'calendar-header';
-  monthHeader.innerHTML = `
-    <button class="month-nav" data-direction="prev">‹</button>
-    <span class="month-title">${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
-    <button class="month-nav" data-direction="next">›</button>
-  `;
-  calendarContainer.appendChild(monthHeader);
-  
-  // Create weekday headers
-  const weekdayHeader = document.createElement('div');
-  weekdayHeader.className = 'calendar-weekdays';
-  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  weekdays.forEach(day => {
-    const dayHeader = document.createElement('div');
-    dayHeader.className = 'weekday-header';
-    dayHeader.textContent = day;
-    weekdayHeader.appendChild(dayHeader);
-  });
-  calendarContainer.appendChild(weekdayHeader);
-  
-  // Create calendar grid
-  const calendarGrid = document.createElement('div');
-  calendarGrid.className = 'calendar-grid';
-  
-  const firstDay = new Date(currentYear, currentMonth, 1);
-  const lastDay = new Date(currentYear, currentMonth + 1, 0);
-  const startDate = new Date(firstDay);
-  startDate.setDate(startDate.getDate() - firstDay.getDay());
-  
-  for (let i = 0; i < 42; i++) { // 6 weeks * 7 days
-    const date = new Date(startDate);
-    date.setDate(startDate.getDate() + i);
-    
-    const dayCell = document.createElement('div');
-    dayCell.className = 'calendar-day';
-    
-    const dateStr = date.toISOString().slice(0, 10);
-    const isCurrentMonth = date.getMonth() === currentMonth;
-    const isToday = dateStr === getTodayISO();
-    const isCompleted = !!habit.completions[dateStr];
-    
-    if (!isCurrentMonth) {
-      dayCell.classList.add('other-month');
-    }
-    if (isToday) {
-      dayCell.classList.add('today');
-    }
-    if (isCompleted) {
-      dayCell.classList.add('completed');
-    }
-    
-    dayCell.textContent = date.getDate();
-    dayCell.setAttribute('data-date', dateStr);
-    dayCell.setAttribute('data-habit-id', habit.id);
-    
-    // Add click handler
-    dayCell.addEventListener('click', async () => {
-      if (isCurrentMonth) {
-        const wasCompleted = !!habit.completions[dateStr];
-        habit.completions[dateStr] = !wasCompleted;
-        await idb.put(habit);
-        renderHabits(habits);
-      }
-    });
-    
-    // Add touch feedback for mobile
-    addTouchFeedback(dayCell);
-    
-    calendarGrid.appendChild(dayCell);
-  }
-  
-  calendarContainer.appendChild(calendarGrid);
-  return calendarContainer;
-}
-
-function renderExportImportControls(habits, onImport) {
-  let controls = document.getElementById('export-import-controls');
-  if (!controls) {
-    controls = document.createElement('div');
-    controls.id = 'export-import-controls';
-    controls.style.display = 'flex';
-    controls.style.gap = '0.8rem';
-    controls.style.marginBottom = '1rem';
-    controls.style.flexDirection = 'column';
-    const app = document.getElementById('app');
-    app.insertBefore(controls, app.querySelector('.habit-form').nextSibling);
-  }
-  controls.innerHTML = '';
-
-  // Export button
-  const exportBtn = document.createElement('button');
-  exportBtn.type = 'button';
-  exportBtn.textContent = 'Export Data';
-  exportBtn.onclick = () => {
-    const data = JSON.stringify(habits, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'habitkit-backup.json';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 100);
-  };
-  
-  // Add touch feedback for mobile
-  addTouchFeedback(exportBtn);
-  controls.appendChild(exportBtn);
-
-  // Import button
-  const importLabel = document.createElement('label');
-  importLabel.textContent = 'Import Data';
-  importLabel.style.cursor = 'pointer';
-  importLabel.style.display = 'flex';
-  importLabel.style.alignItems = 'center';
-  importLabel.style.justifyContent = 'center';
-  importLabel.style.padding = '0.8rem 1.2rem';
-  importLabel.style.background = '#ff8c00';
-  importLabel.style.color = 'white';
-  importLabel.style.borderRadius = '0.8rem';
-  importLabel.style.fontWeight = '600';
-  importLabel.style.minHeight = '44px';
-  importLabel.style.touchAction = 'manipulation';
-
-  const importInput = document.createElement('input');
-  importInput.type = 'file';
-  importInput.accept = '.json,application/json';
-  importInput.style.display = 'none';
-  importInput.onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    try {
-      const text = await file.text();
-      const imported = JSON.parse(text);
-      if (!Array.isArray(imported)) throw new Error('Invalid format');
-      await idb.clear();
-      for (const habit of imported) {
-        await idb.put(habit);
-      }
-      onImport(await idb.getAll());
-      alert('Data imported successfully!');
-    } catch (err) {
-      alert('Import failed: ' + err.message);
-    }
-  };
-  importLabel.appendChild(importInput);
-  
-  // Add touch feedback for mobile
-  addTouchFeedback(importLabel);
-  controls.appendChild(importLabel);
-}
-
-// Mobile-specific event handlers
-function setupMobileHandlers() {
-  if (!isMobile) return;
-  
-  // Prevent double-tap zoom
-  let lastTouchEnd = 0;
-  document.addEventListener('touchend', function (event) {
-    const now = (new Date()).getTime();
-    if (now - lastTouchEnd <= 300) {
-      event.preventDefault();
-    }
-    lastTouchEnd = now;
-  }, false);
-  
-  // Add haptic feedback for iOS
-  if (navigator.vibrate) {
-    const buttons = document.querySelectorAll('button');
-    buttons.forEach(button => {
-      button.addEventListener('click', () => {
-        navigator.vibrate(10);
-      });
-    });
-  }
-  
-  // Handle orientation changes
-  window.addEventListener('orientationchange', () => {
-    setTimeout(() => {
-      // Recalculate layout after orientation change
-      window.scrollTo(0, 0);
-    }, 100);
-  });
-  
-  // Prevent pull-to-refresh on mobile
-  let startY = 0;
-  document.addEventListener('touchstart', (e) => {
-    startY = e.touches[0].pageY;
-  }, { passive: true });
-  
-  document.addEventListener('touchmove', (e) => {
-    const y = e.touches[0].pageY;
-    const pull = y - startY;
-    
-    if (document.scrollTop === 0 && pull > 0) {
-      e.preventDefault();
-    }
-  }, { passive: false });
-}
-
-document.addEventListener('DOMContentLoaded', async () => {
-  // Initialize theme
-  initTheme();
-  
-  // Set up theme toggle
-  const themeToggle = document.getElementById('theme-toggle');
-  console.log('Theme toggle button found:', themeToggle);
-  
-  if (themeToggle) {
-    themeToggle.addEventListener('change', () => {
-      console.log('Theme toggle changed!');
-      toggleTheme();
-    });
-    console.log('Theme toggle event listener attached');
-  } else {
-    console.error('Theme toggle button not found!');
+    return card;
   }
 
-  // Setup mobile-specific handlers
-  setupMobileHandlers();
-  preventZoomOnInput();
+  renderHabitDetail(habit) {
+    const container = document.createElement('div');
+    container.className = 'main-content';
+    
+    // Header with back button
+    const header = document.createElement('header');
+    header.className = 'header';
+    header.innerHTML = `
+      <div class="header-content">
+        <button class="action-btn" onclick="app.showDashboard()" style="margin-right: 16px;">
+          ← Back
+        </button>
+        <h1>${habit.name}</h1>
+        <button class="theme-toggle" onclick="app.toggleTheme()">
+          <span class="icon">${this.isDarkMode ? '☀️' : '🌙'}</span>
+          <span>${this.isDarkMode ? 'Light' : 'Dark'}</span>
+        </button>
+      </div>
+    `;
+    
+    // Large heatmap
+    const heatmapSection = document.createElement('div');
+    heatmapSection.className = 'heatmap-section';
+    heatmapSection.appendChild(this.renderHeatmap(habit, true));
+    
+    // Statistics
+    const stats = this.getHabitStats(habit);
+    const statsSection = document.createElement('div');
+    statsSection.className = 'stats-section';
+    statsSection.innerHTML = `
+      <h3 class="section-title">Statistics</h3>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">${stats.total}</div>
+          <div class="stat-label">Total Completions</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${stats.avgPerWeek.toFixed(1)}</div>
+          <div class="stat-label">Per Week</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${stats.longestStreak}</div>
+          <div class="stat-label">Longest Streak</div>
+        </div>
+      </div>
+    `;
+    
+    container.appendChild(header);
+    container.appendChild(heatmapSection);
+    container.appendChild(statsSection);
+    
+    return container;
+  }
 
-  const app = document.getElementById('app');
-  const form = app.querySelector('form.habit-form');
-  let habits = await idb.getAll();
+  render() {
+    const root = document.getElementById('root');
+    root.innerHTML = '';
+    
+    let content;
+    if (this.currentView === 'dashboard') {
+      content = this.renderDashboard();
+    } else if (this.currentView === 'detail') {
+      content = this.renderHabitDetail(this.selectedHabit);
+    }
+    
+    root.appendChild(content);
+  }
 
-  // Add habit
-  form.onsubmit = async e => {
-    e.preventDefault();
-    const name = form.habitName.value.trim();
-    const color = form.habitColor.value;
+  // Navigation
+  showDashboard() {
+    this.currentView = 'dashboard';
+    this.selectedHabit = null;
+    this.render();
+  }
+
+  showHabitDetail(habit) {
+    this.currentView = 'detail';
+    this.selectedHabit = habit;
+    this.render();
+  }
+
+  // Event handlers
+  handleAddHabit() {
+    const nameInput = document.getElementById('habit-name');
+    const themeSelect = document.getElementById('habit-theme');
+    
+    const name = nameInput.value.trim();
+    const theme = themeSelect.value;
+    
     if (!name) return;
-    const habit = createHabit({ name, color, icon: '' });
-    habits.push(habit);
-    await idb.put(habit);
-    form.reset();
-    renderHabits(habits);
-    renderExportImportControls(habits, newHabits => {
-      habits = newHabits;
-      renderHabits(habits);
-    });
-  };
+    
+    this.addHabit(name, `Track your progress with ${name.toLowerCase()}`, theme);
+    
+    nameInput.value = '';
+    themeSelect.value = 'green';
+  }
 
-  renderHabits(habits);
-  renderExportImportControls(habits, newHabits => {
-    habits = newHabits;
-    renderHabits(habits);
-  });
-}); 
+  toggleTheme() {
+    this.isDarkMode = !this.isDarkMode;
+    document.body.classList.toggle('light-mode', !this.isDarkMode);
+    this.render();
+  }
+
+  setupEventListeners() {
+    // Global click handler for tooltips
+    document.addEventListener('click', () => {
+      this.hideTooltip();
+    });
+  }
+}
+
+// Initialize the app
+const app = new HabitKit(); 
