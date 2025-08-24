@@ -1,15 +1,12 @@
 {
   "name": "HabitKit - GitHub-Style Habit Tracker",
   "short_name": "HabitKit",
-  "description": "Track your habits with GitHub-style contribution heatmaps",
+  "description": "A beautiful habit tracking app with GitHub-style contribution heatmaps",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#0d1117",
   "theme_color": "#0d1117",
   "orientation": "portrait-primary",
-  "scope": "./",
-  "lang": "en",
-  "categories": ["productivity", "lifestyle"],
   "icons": [
     {
       "src": "icon-192.png",
@@ -24,18 +21,19 @@
       "purpose": "any maskable"
     }
   ],
-  "shortcuts": [
+  "categories": ["productivity", "health", "lifestyle"],
+  "screenshots": [
     {
-      "name": "Add New Habit",
-      "short_name": "Add Habit",
-      "description": "Quickly add a new habit to track",
-      "url": "./?action=add",
-      "icons": [
-        {
-          "src": "icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
+      "src": "screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "screenshot-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow"
     }
   ]
-} 
+}
