@@ -117,6 +117,11 @@ body {
   align-items: center;
 }
 
+/* Small spacing tweak for header right-side actions (export/import) */
+.header .action-btn {
+  min-height: 36px;
+}
+
 .header h1 {
   margin: 0;
   font-size: 1.5rem;

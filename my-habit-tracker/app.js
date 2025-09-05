@@ -668,6 +668,30 @@ class HabitKit {
     const title = document.createElement('h1');
     title.textContent = 'HabitKit';
     
+    const headerRight = document.createElement('div');
+    headerRight.style.display = 'flex';
+    headerRight.style.gap = '8px';
+    headerRight.style.alignItems = 'center';
+
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'action-btn';
+    exportBtn.title = 'Export data';
+    exportBtn.textContent = 'Export';
+    exportBtn.onclick = () => this.exportData();
+
+    const importBtn = document.createElement('button');
+    importBtn.className = 'action-btn';
+    importBtn.title = 'Import data';
+    importBtn.textContent = 'Import';
+    importBtn.onclick = () => this.triggerImport();
+
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'application/json,.json';
+    fileInput.style.display = 'none';
+    fileInput.id = 'habit-import-input';
+    fileInput.addEventListener('change', (e) => this.importData(e));
+
     const themeToggle = document.createElement('button');
     themeToggle.className = 'theme-toggle';
     themeToggle.onclick = () => this.toggleTheme();
@@ -681,9 +705,13 @@ class HabitKit {
     
     themeToggle.appendChild(icon);
     themeToggle.appendChild(toggleText);
-    
+
+    headerRight.appendChild(exportBtn);
+    headerRight.appendChild(importBtn);
+    headerRight.appendChild(themeToggle);
     headerContent.appendChild(title);
-    headerContent.appendChild(themeToggle);
+    headerContent.appendChild(headerRight);
+    header.appendChild(fileInput);
     header.appendChild(headerContent);
     
     // Habit form
@@ -853,6 +881,23 @@ class HabitKit {
     const title = document.createElement('h1');
     title.textContent = habit.name;
     
+    const headerRight = document.createElement('div');
+    headerRight.style.display = 'flex';
+    headerRight.style.gap = '8px';
+    headerRight.style.alignItems = 'center';
+
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'action-btn';
+    exportBtn.title = 'Export data';
+    exportBtn.textContent = 'Export';
+    exportBtn.onclick = () => this.exportData();
+
+    const importBtn = document.createElement('button');
+    importBtn.className = 'action-btn';
+    importBtn.title = 'Import data';
+    importBtn.textContent = 'Import';
+    importBtn.onclick = () => this.triggerImport();
+
     const themeToggle = document.createElement('button');
     themeToggle.className = 'theme-toggle';
     themeToggle.onclick = () => this.toggleTheme();
@@ -868,8 +913,11 @@ class HabitKit {
     themeToggle.appendChild(toggleText);
     
     headerContent.appendChild(backBtn);
+    headerRight.appendChild(exportBtn);
+    headerRight.appendChild(importBtn);
+    headerRight.appendChild(themeToggle);
     headerContent.appendChild(title);
-    headerContent.appendChild(themeToggle);
+    headerContent.appendChild(headerRight);
     header.appendChild(headerContent);
     
     // Large heatmap section
@@ -1017,6 +1065,72 @@ class HabitKit {
     this.isDarkMode = !this.isDarkMode;
     document.body.classList.toggle('light-mode', !this.isDarkMode);
     this.render();
+  }
+
+  // Export / Import
+  exportData() {
+    try {
+      const backup = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        data: {
+          habits: this.habits
+        }
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      a.href = url;
+      a.download = `habitkit-backup-${timestamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      this.showNotification('Exported data successfully.', 'success');
+    } catch (e) {
+      console.error('Export error', e);
+      this.showNotification('Failed to export data.', 'error');
+    }
+  }
+
+  triggerImport() {
+    const input = document.getElementById('habit-import-input');
+    if (input) input.click();
+  }
+
+  importData(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const json = JSON.parse(reader.result);
+        // Basic validation
+        if (!json || !json.data || !Array.isArray(json.data.habits)) {
+          throw new Error('Invalid backup format');
+        }
+        // Deep validate minimal structure
+        const valid = json.data.habits.every(h => typeof h.id !== 'undefined' && typeof h.name === 'string' && h.completions && typeof h.completions === 'object');
+        if (!valid) {
+          throw new Error('Backup missing required fields');
+        }
+        this.habits = json.data.habits;
+        this.saveHabits();
+        this.render();
+        this.showNotification('Imported data successfully.', 'success');
+      } catch (e) {
+        console.error('Import error', e);
+        this.showNotification('Failed to import data. Invalid file.', 'error');
+      } finally {
+        // Reset input so selecting the same file again triggers change
+        event.target.value = '';
+      }
+    };
+    reader.onerror = () => {
+      this.showNotification('Failed to read file.', 'error');
+    };
+    reader.readAsText(file);
   }
 
   setupEventListeners() {
