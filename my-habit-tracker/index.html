@@ -5,29 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HabitKit - GitHub-Style Habit Tracker</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
+    <!-- Temporarily removed PWA features for local development -->
     <meta name="theme-color" content="#0d1117">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 </head>
 <body>
-    <div id="root"></div>
-    <script src="app.js"></script>
+    <div id="root">
+        <h1>Loading HabitKit...</h1>
+        <p>If you see this message, the app is loading...</p>
+    </div>
+    
     <script>
-        // Register service worker for PWA functionality
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then((registration) => {
-                        console.log('SW registered: ', registration);
-                    })
-                    .catch((registrationError) => {
-                        console.log('SW registration failed: ', registrationError);
-                    });
-            });
+        console.log('Page loading...');
+        console.log('Root element:', document.getElementById('root'));
+        
+        // Test basic functionality
+        try {
+            console.log('Testing localStorage...');
+            localStorage.setItem('test', 'working');
+            console.log('localStorage test:', localStorage.getItem('test'));
+        } catch (e) {
+            console.error('localStorage error:', e);
         }
+    </script>
+    
+    <script src="app.js"></script>
+    
+    <script>
+        console.log('App.js loaded');
+        console.log('App instance:', window.app);
+        
+        // Check if app initialized
+        setTimeout(() => {
+            console.log('After timeout - App instance:', window.app);
+            console.log('Root content:', document.getElementById('root').innerHTML);
+        }, 1000);
     </script>
 </body>
 </html>

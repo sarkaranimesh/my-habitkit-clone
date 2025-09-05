@@ -1,5 +1,5 @@
-// HabitKit - GitHub-Style Habit Tracker with Contribution Heatmaps
-// Enhanced version with proper GitHub-style layout
+// HabitKit - GitHub-Style Habit Tracker with Monthly Calendar View
+// Enhanced version with monthly calendar layout
 
 class HabitKit {
   constructor() {
@@ -7,6 +7,8 @@ class HabitKit {
     this.currentView = 'dashboard'; // 'dashboard' or 'detail'
     this.selectedHabit = null;
     this.isDarkMode = true;
+    this.currentMonth = new Date().getMonth();
+    this.currentYear = new Date().getFullYear();
     
     this.init();
   }
@@ -17,7 +19,44 @@ class HabitKit {
     this.render();
   }
 
-  // Enhanced GitHub-style date utilities
+  // Monthly calendar utilities
+  getDaysInMonth(year, month) {
+    return new Date(year, month + 1, 0).getDate();
+  }
+
+  getFirstDayOfMonth(year, month) {
+    return new Date(year, month, 1).getDay();
+  }
+
+  getMonthName(month) {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[month];
+  }
+
+  getPreviousMonth() {
+    if (this.currentMonth === 0) {
+      this.currentMonth = 11;
+      this.currentYear--;
+    } else {
+      this.currentMonth--;
+    }
+    this.render();
+  }
+
+  getNextMonth() {
+    if (this.currentMonth === 11) {
+      this.currentMonth = 0;
+      this.currentYear++;
+    } else {
+      this.currentMonth++;
+    }
+    this.render();
+  }
+
+  // GitHub-style heatmap utilities
   getStartOfYear(year = new Date().getFullYear()) {
     return new Date(year, 0, 1);
   }
@@ -26,12 +65,9 @@ class HabitKit {
     const startOfYear = this.getStartOfYear(year);
     const dayOfWeek = startOfYear.getDay(); // 0 = Sunday
     const firstSunday = new Date(startOfYear);
-    
-    // If year doesn't start on Sunday, go back to previous Sunday
     if (dayOfWeek !== 0) {
       firstSunday.setDate(startOfYear.getDate() - dayOfWeek);
     }
-    
     return firstSunday;
   }
 
@@ -49,7 +85,170 @@ class HabitKit {
     return targetDate;
   }
 
-  // GitHub-style completion level (simplified for now)
+  // Heatmap completion level (binary for now)
+  getHeatmapCompletionLevel(habit, date) {
+    const dateStr = date.toISOString().slice(0, 10);
+    return habit.completions[dateStr] ? 1 : 0;
+  }
+
+  // Heatmap color progression
+  getHeatmapColor(level, habitColor) {
+    if (level === 0) return 'var(--heatmap-empty)';
+    const colors = {
+      '#39d353': ['#0e4429', '#006d32', '#26a641', '#39d353'],
+      '#a371f7': ['#1a103d', '#4c2889', '#7c3aed', '#a371f7'],
+      '#f85149': ['#3d1216', '#7d1814', '#b91c1c', '#f85149'],
+      '#ffa657': ['#3d1e00', '#7c2d12', '#ea580c', '#ffa657'],
+      '#58a6ff': ['#0c2a6d', '#1e40af', '#2563eb', '#58a6ff']
+    };
+    const colorArray = colors[habitColor] || colors['#39d353'];
+    return colorArray[level - 1] || colorArray[0];
+  }
+
+  // Heatmap tooltip
+  showHeatmapTooltip(element, date, isCompleted) {
+    const tooltip = document.createElement('div');
+    tooltip.className = 'heatmap-tooltip';
+    const formattedDate = date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    tooltip.textContent = `${formattedDate} - ${isCompleted ? 'Completed' : 'Not completed'}`;
+    document.body.appendChild(tooltip);
+    const rect = element.getBoundingClientRect();
+    tooltip.style.left = `${rect.left + rect.width / 2}px`;
+    tooltip.style.top = `${rect.top - tooltip.offsetHeight - 10}px`;
+    const tooltipRect = tooltip.getBoundingClientRect();
+    if (tooltipRect.left < 10) {
+      tooltip.style.left = '10px';
+      tooltip.style.transform = 'none';
+    } else if (tooltipRect.right > window.innerWidth - 10) {
+      tooltip.style.left = `${window.innerWidth - tooltipRect.width - 10}px`;
+      tooltip.style.transform = 'none';
+    }
+    element._tooltip = tooltip;
+  }
+
+  hideHeatmapTooltips() {
+    const tooltips = document.querySelectorAll('.heatmap-tooltip');
+    tooltips.forEach(t => t.remove());
+  }
+
+  // Heatmap rendering
+  renderHeatmap(habit, isLarge = false) {
+    const container = document.createElement('div');
+    container.className = 'heatmap-container';
+    const header = document.createElement('div');
+    header.className = 'heatmap-header';
+    const title = document.createElement('div');
+    title.className = 'heatmap-title';
+    title.textContent = isLarge ? 'One year of activity' : 'Activity overview';
+    const legend = document.createElement('div');
+    legend.className = 'heatmap-legend';
+    const lessText = document.createElement('span');
+    lessText.className = 'legend-text';
+    lessText.textContent = 'Less';
+    const squares = document.createElement('div');
+    squares.className = 'legend-squares';
+    for (let i = 0; i <= 4; i++) {
+      const square = document.createElement('div');
+      square.className = `legend-square level-${i}`;
+      square.style.background = this.getHeatmapColor(i, habit.color);
+      squares.appendChild(square);
+    }
+    const moreText = document.createElement('span');
+    moreText.className = 'legend-text';
+    moreText.textContent = 'More';
+    legend.appendChild(lessText);
+    legend.appendChild(squares);
+    legend.appendChild(moreText);
+    header.appendChild(title);
+    header.appendChild(legend);
+    container.appendChild(header);
+    const wrapper = document.createElement('div');
+    wrapper.className = 'heatmap-wrapper';
+    const gridContainer = document.createElement('div');
+    gridContainer.className = 'heatmap-grid-container';
+    const dayLabels = document.createElement('div');
+    dayLabels.className = 'day-labels';
+    const dayNames = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
+    dayNames.forEach(day => {
+      const label = document.createElement('div');
+      label.className = 'day-label';
+      label.textContent = day;
+      dayLabels.appendChild(label);
+    });
+    const mainArea = document.createElement('div');
+    mainArea.className = 'heatmap-main';
+    const { monthLabels, grid } = this.createHeatmapGrid(habit);
+    mainArea.appendChild(monthLabels);
+    mainArea.appendChild(grid);
+    gridContainer.appendChild(dayLabels);
+    gridContainer.appendChild(mainArea);
+    wrapper.appendChild(gridContainer);
+    container.appendChild(wrapper);
+    return container;
+  }
+
+  createHeatmapGrid(habit) {
+    const currentYear = new Date().getFullYear();
+    const weeksInYear = this.getWeeksInYear(currentYear);
+    const today = new Date();
+    const monthLabels = document.createElement('div');
+    monthLabels.className = 'month-labels';
+    const grid = document.createElement('div');
+    grid.className = 'heatmap-grid';
+    const monthPositions = [];
+    let currentMonth = -1;
+    for (let week = 0; week < weeksInYear; week++) {
+      const weekColumn = document.createElement('div');
+      weekColumn.className = 'week-column';
+      let weekWidth = 0;
+      for (let day = 0; day < 7; day++) {
+        const cellDate = this.getDateFromWeekAndDay(week, day, currentYear);
+        if (cellDate.getMonth() !== currentMonth && cellDate <= today) {
+          currentMonth = cellDate.getMonth();
+          const monthName = cellDate.toLocaleDateString('en-US', { month: 'short' });
+          monthPositions.push({ week, monthName, width: 0 });
+        }
+        const cell = document.createElement('div');
+        cell.className = 'heatmap-cell';
+        if (cellDate > today || cellDate.getFullYear() !== currentYear) {
+          cell.style.visibility = 'hidden';
+        } else {
+          const level = this.getHeatmapCompletionLevel(habit, cellDate);
+          cell.classList.add(`level-${level}`);
+          cell.addEventListener('click', () => {
+            this.toggleHabitCompletion(habit.id, cellDate);
+          });
+          cell.addEventListener('mouseenter', (e) => {
+            this.showHeatmapTooltip(e.target, cellDate, level > 0);
+          });
+          cell.addEventListener('mouseleave', () => {
+            this.hideHeatmapTooltips();
+          });
+        }
+        weekColumn.appendChild(cell);
+        weekWidth = Math.max(weekWidth, 13);
+      }
+      grid.appendChild(weekColumn);
+      if (monthPositions.length > 0) {
+        monthPositions[monthPositions.length - 1].width += weekWidth;
+      }
+    }
+    monthPositions.forEach(({ monthName, width }) => {
+      const label = document.createElement('div');
+      label.className = 'month-label';
+      label.textContent = monthName;
+      label.style.width = `${Math.max(width, 30)}px`;
+      monthLabels.appendChild(label);
+    });
+    return { monthLabels, grid };
+  }
+
+  // Monthly calendar completion level
   getCompletionLevel(habit, date) {
     const dateStr = date.toISOString().slice(0, 10);
     return habit.completions[dateStr] ? 1 : 0;
@@ -229,172 +428,129 @@ class HabitKit {
     }, 3000);
   }
 
-  // Enhanced GitHub-style heatmap rendering
-  renderHeatmap(habit, isLarge = false) {
+  // Monthly calendar rendering
+  renderMonthlyCalendar(habit, isLarge = false) {
     const container = document.createElement('div');
-    container.className = 'heatmap-container';
+    container.className = 'calendar-container';
     
-    // Header with title and legend
+    // Header with month navigation
     const header = document.createElement('div');
-    header.className = 'heatmap-header';
+    header.className = 'calendar-header';
     
     const title = document.createElement('div');
-    title.className = 'heatmap-title';
-    title.textContent = isLarge ? 'One year of activity' : 'Activity overview';
+    title.className = 'calendar-title';
+    title.textContent = isLarge ? `${this.getMonthName(this.currentMonth)} ${this.currentYear}` : 'Monthly View';
     
-    const legend = document.createElement('div');
-    legend.className = 'heatmap-legend';
+    const navigation = document.createElement('div');
+    navigation.className = 'calendar-navigation';
     
-    const lessText = document.createElement('span');
-    lessText.className = 'legend-text';
-    lessText.textContent = 'Less';
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'nav-btn prev-btn';
+    prevBtn.innerHTML = '←';
+    prevBtn.onclick = () => this.getPreviousMonth();
     
-    const squares = document.createElement('div');
-    squares.className = 'legend-squares';
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'nav-btn next-btn';
+    nextBtn.innerHTML = '→';
+    nextBtn.onclick = () => this.getNextMonth();
     
-    for (let i = 0; i <= 4; i++) {
-      const square = document.createElement('div');
-      square.className = `legend-square level-${i}`;
-      square.style.background = this.getHeatmapColor(i, habit.color);
-      squares.appendChild(square);
-    }
+    navigation.appendChild(prevBtn);
+    navigation.appendChild(title);
+    navigation.appendChild(nextBtn);
     
-    const moreText = document.createElement('span');
-    moreText.className = 'legend-text';
-    moreText.textContent = 'More';
-    
-    legend.appendChild(lessText);
-    legend.appendChild(squares);
-    legend.appendChild(moreText);
-    
-    header.appendChild(title);
-    header.appendChild(legend);
+    header.appendChild(navigation);
     container.appendChild(header);
     
-    // Heatmap wrapper with scrolling
-    const wrapper = document.createElement('div');
-    wrapper.className = 'heatmap-wrapper';
-    
-    const gridContainer = document.createElement('div');
-    gridContainer.className = 'heatmap-grid-container';
-    
-    // Day labels (Mon, Wed, Fri only - like GitHub)
-    const dayLabels = document.createElement('div');
-    dayLabels.className = 'day-labels';
-    
-    const dayNames = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
-    dayNames.forEach(day => {
-      const label = document.createElement('div');
-      label.className = 'day-label';
-      label.textContent = day;
-      dayLabels.appendChild(label);
-    });
-    
-    // Main heatmap area
-    const mainArea = document.createElement('div');
-    mainArea.className = 'heatmap-main';
-    
-    // Month labels and grid
-    const { monthLabels, grid } = this.createHeatmapGrid(habit);
-    mainArea.appendChild(monthLabels);
-    mainArea.appendChild(grid);
-    
-    gridContainer.appendChild(dayLabels);
-    gridContainer.appendChild(mainArea);
-    wrapper.appendChild(gridContainer);
-    container.appendChild(wrapper);
+    // Calendar grid
+    const calendar = this.createMonthlyCalendar(habit);
+    container.appendChild(calendar);
     
     return container;
   }
 
-  createHeatmapGrid(habit) {
-    const currentYear = new Date().getFullYear();
-    const weeksInYear = this.getWeeksInYear(currentYear);
-    const today = new Date();
+  createMonthlyCalendar(habit) {
+    const calendar = document.createElement('div');
+    calendar.className = 'monthly-calendar';
     
-    // Create month labels container
-    const monthLabels = document.createElement('div');
-    monthLabels.className = 'month-labels';
+    // Day headers (Sun, Mon, Tue, etc.)
+    const dayHeaders = document.createElement('div');
+    dayHeaders.className = 'day-headers';
     
-    // Create grid container
-    const grid = document.createElement('div');
-    grid.className = 'heatmap-grid';
-    
-    // Track month positions for labels
-    const monthPositions = [];
-    let currentMonth = -1;
-    
-    // Generate weeks (columns)
-    for (let week = 0; week < weeksInYear; week++) {
-      const weekColumn = document.createElement('div');
-      weekColumn.className = 'week-column';
-      
-      let weekWidth = 0;
-      
-      // Generate days in week (rows) - Sunday to Saturday
-      for (let day = 0; day < 7; day++) {
-        const cellDate = this.getDateFromWeekAndDay(week, day, currentYear);
-        
-        // Check if we need a month label
-        if (cellDate.getMonth() !== currentMonth && cellDate <= today) {
-          currentMonth = cellDate.getMonth();
-          const monthName = cellDate.toLocaleDateString('en-US', { month: 'short' });
-          monthPositions.push({ week, monthName, width: 0 });
-        }
-        
-        const cell = document.createElement('div');
-        cell.className = 'heatmap-cell';
-        
-        if (cellDate > today || cellDate.getFullYear() !== currentYear) {
-          // Future dates or wrong year - make invisible
-          cell.style.visibility = 'hidden';
-        } else {
-          const level = this.getCompletionLevel(habit, cellDate);
-          cell.classList.add(`level-${level}`);
-          
-          // Add click handler
-          cell.addEventListener('click', () => {
-            this.toggleHabitCompletion(habit.id, cellDate);
-          });
-          
-          // Add tooltip
-          cell.addEventListener('mouseenter', (e) => {
-            this.showTooltip(e.target, cellDate, level > 0, habit);
-          });
-          
-          cell.addEventListener('mouseleave', () => {
-            this.hideTooltip();
-          });
-        }
-        
-        weekColumn.appendChild(cell);
-        weekWidth = Math.max(weekWidth, 13); // 11px cell + 2px for potential borders
-      }
-      
-      grid.appendChild(weekColumn);
-      
-      // Update width for current month
-      if (monthPositions.length > 0) {
-        monthPositions[monthPositions.length - 1].width += weekWidth;
-      }
-    }
-    
-    // Add month labels
-    monthPositions.forEach(({ monthName, width }) => {
-      const label = document.createElement('div');
-      label.className = 'month-label';
-      label.textContent = monthName;
-      label.style.width = `${Math.max(width, 30)}px`; // Minimum width
-      monthLabels.appendChild(label);
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    dayNames.forEach(day => {
+      const header = document.createElement('div');
+      header.className = 'day-header';
+      header.textContent = day;
+      dayHeaders.appendChild(header);
     });
     
-    return { monthLabels, grid };
+    // Calendar grid
+    const grid = document.createElement('div');
+    grid.className = 'calendar-grid';
+    
+    const daysInMonth = this.getDaysInMonth(this.currentYear, this.currentMonth);
+    const firstDayOfMonth = this.getFirstDayOfMonth(this.currentYear, this.currentMonth);
+    const today = new Date();
+    
+    // Add empty cells for days before the first day of the month
+    for (let i = 0; i < firstDayOfMonth; i++) {
+      const emptyCell = document.createElement('div');
+      emptyCell.className = 'calendar-day empty';
+      grid.appendChild(emptyCell);
+    }
+    
+    // Add cells for each day of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const cell = document.createElement('div');
+      cell.className = 'calendar-day';
+      
+      const date = new Date(this.currentYear, this.currentMonth, day);
+      const isToday = date.toDateString() === today.toDateString();
+      const isPast = date <= today;
+      
+      if (isToday) {
+        cell.classList.add('today');
+      }
+      
+      if (isPast) {
+        const level = this.getCompletionLevel(habit, date);
+        cell.classList.add(`level-${level}`);
+        
+        // Add click handler for past dates
+        cell.addEventListener('click', () => {
+          this.toggleHabitCompletion(habit.id, date);
+        });
+        
+        // Add tooltip
+        cell.addEventListener('mouseenter', (e) => {
+          this.showTooltip(e.target, date, level > 0, habit);
+        });
+        
+        cell.addEventListener('mouseleave', () => {
+          this.hideTooltip();
+        });
+      } else {
+        cell.classList.add('future');
+      }
+      
+      const dayNumber = document.createElement('span');
+      dayNumber.className = 'day-number';
+      dayNumber.textContent = day;
+      cell.appendChild(dayNumber);
+      
+      grid.appendChild(cell);
+    }
+    
+    calendar.appendChild(dayHeaders);
+    calendar.appendChild(grid);
+    
+    return calendar;
   }
 
-  getHeatmapColor(level, habitColor) {
-    if (level === 0) return 'var(--heatmap-empty)';
+  getCalendarColor(level, habitColor) {
+    if (level === 0) return 'var(--calendar-empty)';
     
-    // GitHub-style color progression
+    // Calendar color progression
     const colors = {
       '#39d353': ['#0e4429', '#006d32', '#26a641', '#39d353'],
       '#a371f7': ['#1a103d', '#4c2889', '#7c3aed', '#a371f7'],
@@ -420,7 +576,7 @@ class HabitKit {
 
   showTooltip(element, date, isCompleted, habit) {
     const tooltip = document.createElement('div');
-    tooltip.className = 'heatmap-tooltip';
+    tooltip.className = 'calendar-tooltip';
     
     const formattedDate = date.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -450,7 +606,8 @@ class HabitKit {
   }
 
   hideTooltip() {
-    const tooltips = document.querySelectorAll('.heatmap-tooltip');
+    // Simple tooltip hiding - can be enhanced later
+    const tooltips = document.querySelectorAll('.calendar-tooltip');
     tooltips.forEach(tooltip => tooltip.remove());
   }
 
@@ -496,7 +653,7 @@ class HabitKit {
     return { total, avgPerWeek, longestStreak };
   }
 
-  // UI rendering (keeping your original structure but with updated heatmap)
+  // UI rendering (keeping your original structure but with updated calendar)
   renderDashboard() {
     const container = document.createElement('div');
     container.className = 'main-content';
@@ -654,7 +811,7 @@ class HabitKit {
     header.appendChild(info);
     header.appendChild(actions);
     
-    // Enhanced heatmap
+    // GitHub-style heatmap
     const heatmap = this.renderHeatmap(habit, false);
     
     // Delete button at bottom right
@@ -715,10 +872,10 @@ class HabitKit {
     headerContent.appendChild(themeToggle);
     header.appendChild(headerContent);
     
-    // Large heatmap
-    const heatmapSection = document.createElement('div');
-    heatmapSection.className = 'heatmap-section';
-    heatmapSection.appendChild(this.renderHeatmap(habit, true));
+    // Large heatmap section
+    const calendarSection = document.createElement('div');
+    calendarSection.className = 'calendar-section';
+    calendarSection.appendChild(this.renderHeatmap(habit, true));
     
     // Statistics
     const stats = this.getHabitStats(habit);
@@ -786,10 +943,98 @@ class HabitKit {
     statsSection.appendChild(sectionTitle);
     statsSection.appendChild(statsGrid);
     
-    // Add heatmap section to container
-    container.appendChild(heatmapSection);
+    // Add calendar section to container
+    container.appendChild(calendarSection);
     container.appendChild(statsSection);
     
     return container;
   }
-}     
+
+  render() {
+    const root = document.getElementById('root');
+    root.innerHTML = '';
+    
+    let content;
+    if (this.currentView === 'dashboard') {
+      content = this.renderDashboard();
+    } else if (this.currentView === 'detail') {
+      content = this.renderHabitDetail(this.selectedHabit);
+    }
+    
+    root.appendChild(content);
+  }
+
+  // Navigation
+  showDashboard() {
+    this.currentView = 'dashboard';
+    this.selectedHabit = null;
+    this.render();
+  }
+
+  showHabitDetail(habit) {
+    this.currentView = 'detail';
+    this.selectedHabit = habit;
+    this.render();
+  }
+
+  // Event handlers
+  handleAddHabit() {
+    console.log('handleAddHabit called'); // Debug log
+    
+    const nameInput = document.getElementById('habit-name');
+    const themeSelect = document.getElementById('habit-theme');
+    
+    if (!nameInput || !themeSelect) {
+      console.error('Form elements not found:', { nameInput, themeSelect });
+      return;
+    }
+    
+    const name = nameInput.value.trim();
+    const theme = themeSelect.value;
+    
+    console.log('Form values:', { name, theme }); // Debug log
+    
+    if (!name) {
+      console.log('No name provided, returning');
+      return;
+    }
+    
+    console.log('Adding habit:', { name, theme }); // Debug log
+    
+    this.addHabit(name, `Track your progress with ${name.toLowerCase()}`, theme);
+    
+    // Reset form
+    nameInput.value = '';
+    themeSelect.value = 'green';
+    
+    // Focus back to name input for better UX
+    nameInput.focus();
+    
+    console.log('Habit added successfully'); // Debug log
+  }
+
+  toggleTheme() {
+    this.isDarkMode = !this.isDarkMode;
+    document.body.classList.toggle('light-mode', !this.isDarkMode);
+    this.render();
+  }
+
+  setupEventListeners() {
+    // Global click handler for tooltips
+    document.addEventListener('click', () => {
+      this.hideTooltip();
+      this.hideHeatmapTooltips();
+    });
+  }
+
+  hideTooltip() {
+    // Simple tooltip hiding - can be enhanced later
+    const tooltips = document.querySelectorAll('.calendar-tooltip');
+    tooltips.forEach(tooltip => tooltip.remove());
+    // Also remove any heatmap tooltips for safety
+    this.hideHeatmapTooltips();
+  }
+}
+
+// Initialize the app
+const app = new HabitKit();     

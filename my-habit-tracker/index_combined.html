@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HabitKit - GitHub-Style Habit Tracker</title>
+    <style>
+        /* Enhanced GitHub-style CSS with improved heatmap layout */
+        :root {
+            /* Dark mode colors (default) */
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --text-primary: #f0f6fc;
+            --text-secondary: #8b949e;
+            --text-muted: #484f58;
+            --border-color: #30363d;
+            --border-hover: #484f58;
+            --shadow: rgba(0, 0, 0, 0.4);
+            --shadow-hover: rgba(0, 0, 0, 0.6);
+            
+            /* Habit theme colors */
+            --habit-green: #39d353;
+            --habit-purple: #a371f7;
+            --habit-red: #f85149;
+            --habit-orange: #ffa657;
+            --habit-blue: #58a6ff;
+            
+            /* Heatmap colors */
+            --heatmap-empty: #21262d;
+            --heatmap-level-1: #0e4429;
+            --heatmap-level-2: #006d32;
+            --heatmap-level-3: #26a641;
+            --heatmap-level-4: #39d353;
+            
+            /* Spacing */
+            --spacing-xs: 0.25rem;
+            --spacing-sm: 0.5rem;
+            --spacing-md: 1rem;
+            --spacing-lg: 1.5rem;
+            --spacing-xl: 2rem;
+            
+            /* Border radius */
+            --radius-sm: 0.5rem;
+            --radius-md: 0.75rem;
+            --radius-lg: 1rem;
+            
+            /* Transitions */
+            --transition-fast: 0.15s ease;
+            --transition-normal: 0.25s ease;
+            --transition-slow: 0.35s ease;
+        }
+
+        /* Light mode */
+        body.light-mode {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f6f8fa;
+            --bg-tertiary: #f1f3f4;
+            --text-primary: #24292f;
+            --text-secondary: #656d76;
+            --text-muted: #8c959f;
+            --border-color: #d0d7de;
+            --border-hover: #8c959f;
+            --shadow: rgba(0, 0, 0, 0.08);
+            --shadow-hover: rgba(0, 0, 0, 0.12);
+            --heatmap-empty: #ebedf0;
+            --heatmap-level-1: #9be9a8;
+            --heatmap-level-2: #40c463;
+            --heatmap-level-3: #30a14e;
+            --heatmap-level-4: #216e39;
+        }
+
+        /* Base styles */
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            transition: background-color var(--transition-normal), color var(--transition-normal);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            line-height: 1.5;
+        }
+
+        #root {
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: var(--spacing-md) var(--spacing-lg);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .header h1::before {
+            content: "📊";
+            font-size: 1.8rem;
+        }
+
+        /* Theme toggle */
+        .theme-toggle {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-sm);
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            color: var(--text-secondary);
+        }
+
+        .theme-toggle:hover {
+            background: var(--bg-secondary);
+            border-color: var(--border-hover);
+            color: var(--text-primary);
+        }
+
+        .theme-toggle .icon {
+            font-size: 1.2rem;
+        }
+
+        /* Main content */
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: var(--spacing-lg);
+        }
+
+        /* Habit form */
+        .habit-form {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-xl);
+            box-shadow: 0 4px 12px var(--shadow);
+        }
+
+        .form-title {
+            margin: 0 0 var(--spacing-md) 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: var(--spacing-md);
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-xs);
+        }
+
+        .form-group label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: var(--spacing-md);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: border-color var(--transition-fast);
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--habit-blue);
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+        }
+
+        .form-group input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .form-submit {
+            background: var(--habit-blue);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md) var(--spacing-lg);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            min-height: 48px;
+        }
+
+        .form-submit:hover {
+            background: #4d9eff;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(88, 166, 255, 0.3);
+        }
+
+        .form-submit:active {
+            transform: translateY(0);
+        }
+
+        /* Habit cards grid */
+        .habits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: var(--spacing-lg);
+            margin-bottom: var(--spacing-xl);
+        }
+
+        /* Habit card */
+        .habit-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            transition: all var(--transition-normal);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .habit-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px var(--shadow-hover);
+            border-color: var(--border-hover);
+        }
+
+        .habit-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--habit-color, var(--habit-green));
+        }
+
+        .habit-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .habit-info {
+            flex: 1;
+        }
+
+        .habit-name {
+            margin: 0 0 var(--spacing-xs) 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .habit-description {
+            margin: 0;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .habit-actions {
+            display: flex;
+            gap: var(--spacing-sm);
+        }
+
+        .action-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-sm);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 36px;
+            min-height: 36px;
+            font-size: 0.875rem;
+        }
+
+        .action-btn:hover {
+            background: var(--bg-primary);
+            border-color: var(--border-hover);
+            color: var(--text-primary);
+        }
+
+        .action-btn.primary {
+            background: var(--habit-color, var(--habit-green));
+            color: white;
+            border-color: var(--habit-color, var(--habit-green));
+        }
+
+        .action-btn.primary:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .action-btn.primary.completed {
+            background: var(--text-secondary);
+            opacity: 0.7;
+        }
+
+        /* Enhanced GitHub-style heatmap */
+        .heatmap-container {
+            margin: var(--spacing-md) 0;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+        }
+
+        .heatmap-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .heatmap-title {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .heatmap-legend {
+            display: flex;
+            gap: var(--spacing-xs);
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .legend-text {
+            margin: 0 4px;
+        }
+
+        .legend-squares {
+            display: flex;
+            gap: 2px;
+            align-items: center;
+        }
+
+        .legend-square {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+        }
+
+        /* GitHub-style heatmap grid with proper layout */
+        .heatmap-wrapper {
+            position: relative;
+            overflow-x: auto;
+            scrollbar-width: thin;
+        }
+
+        .heatmap-grid-container {
+            display: flex;
+            gap: 8px;
+            min-width: max-content;
+        }
+
+        /* Day labels (Mon, Wed, Fri only - like GitHub) */
+        .day-labels {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 91px; /* 7 * 11px + 6 * 2px gaps */
+            padding-top: 16px; /* Align with first row after month labels */
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-right: 4px;
+        }
+
+        .day-label {
+            height: 11px;
+            display: flex;
+            align-items: center;
+            line-height: 1;
+        }
+
+        /* Main grid area */
+        .heatmap-main {
+            flex: 1;
+            min-width: max-content;
+        }
+
+        /* Month labels */
+        .month-labels {
+            display: flex;
+            margin-bottom: 4px;
+            height: 16px;
+            font-size: 11px;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .month-label {
+            text-align: left;
+            padding-left: 2px;
+        }
+
+        /* The actual heatmap grid */
+        .heatmap-grid {
+            display: flex;
+            gap: 2px;
+        }
+
+        .week-column {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .heatmap-cell {
+            width: 11px;
+            height: 11px;
+            border-radius: 2px;
+            background: var(--heatmap-empty);
+            transition: all var(--transition-fast);
+            cursor: pointer;
+            position: relative;
+        }
+
+        .heatmap-cell:hover {
+            stroke: var(--text-secondary);
+            stroke-width: 1px;
+            transform: scale(1.1);
+        }
+
+        .heatmap-cell.level-0 { background: var(--heatmap-empty); }
+        .heatmap-cell.level-1 { background: var(--heatmap-level-1); }
+        .heatmap-cell.level-2 { background: var(--heatmap-level-2); }
+        .heatmap-cell.level-3 { background: var(--heatmap-level-3); }
+        .heatmap-cell.level-4 { background: var(--heatmap-level-4); }
+
+        /* Tooltip */
+        .heatmap-tooltip {
+            position: absolute;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            box-shadow: 0 4px 12px var(--shadow);
+            border: 1px solid var(--border-color);
+            z-index: 1000;
+            pointer-events: none;
+            white-space: nowrap;
+            transform: translateX(-50%);
+        }
+
+        /* Delete button */
+        .habit-delete-section {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: var(--spacing-md);
+            padding-top: var(--spacing-md);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .delete-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-sm) var(--spacing-md);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+        }
+
+        .delete-btn:hover {
+            background: var(--habit-red);
+            color: white;
+            border-color: var(--habit-red);
+            transform: translateY(-1px);
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .main-content {
+                padding: var(--spacing-md);
+            }
+            
+            .form-grid {
+                grid-template-columns: 1fr;
+                gap: var(--spacing-md);
+            }
+            
+            .habits-grid {
+                grid-template-columns: 1fr;
+                gap: var(--spacing-md);
+            }
+            
+            .heatmap-cell {
+                width: 9px;
+                height: 9px;
+            }
+        }
+
+        /* Scrollbar styling */
+        .heatmap-wrapper::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .heatmap-wrapper::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+            border-radius: 4px;
+        }
+
+        .heatmap-wrapper::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        .heatmap-wrapper::-webkit-scrollbar-thumb:hover {
+            background: var(--border-hover);
+        }
+
+        /* Focus styles */
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible {
+            outline: 2px solid var(--habit-blue);
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script>
+        // Enhanced HabitKit with proper GitHub-style heatmap
+        class HabitKit {
+            constructor() {
+                this.habits = [];
+                this.currentView = 'dashboard';
+                this.selectedHabit = null;
+                this.isDarkMode = true;
+                
+                this.init();
+            }
+
+            init() {
+                this.loadHabits();
+                this.setupEventListeners();
+                this.render();
+            }
+
+            // GitHub-style date utilities
+            getStartOfYear(year = new Date().getFullYear()) {
+                return new Date(year, 0, 1);
+            }
+
+            getFirstSunday(year = new Date().getFullYear()) {
+                const startOfYear = this.getStartOfYear(year);
+                const dayOfWeek = startOfYear.getDay(); // 0 = Sunday
+                const firstSunday = new Date(startOfYear);
+                
+                if (dayOfWeek !== 0) {
+                    firstSunday.setDate(startOfYear.getDate() - dayOfWeek);
+                }
+                
+                return firstSunday;
+            }
+
+            getWeeksInYear(year = new Date().getFullYear()) {
+                const firstSunday = this.getFirstSunday(year);
+                const lastDayOfYear = new Date(year, 11, 31);
+                const daysDiff = Math.ceil((lastDayOfYear - firstSunday) / (1000 * 60 * 60 * 24));
+                return Math.ceil(daysDiff / 7);
+            }
+
+            getDateFromWeekAndDay(weekIndex, dayIndex, year = new Date().getFullYear()) {
+                const firstSunday = this.getFirstSunday(year);
+                const targetDate = new Date(firstSunday);
+                targetDate.setDate(firstSunday.getDate() + (weekIndex * 7) + dayIndex);
+                return targetDate;
+            }
+
+            getCompletionLevel(habit, date) {
+                const dateStr = date.toISOString().slice(0, 10);
+                return habit.completions[dateStr] ? 1 : 0;
+            }
+
+            // Data management
+            loadHabits() {
+                const saved = localStorage.getItem('habitkit-habits');
+                if (saved) {
+                    this.habits = JSON.parse(saved);
+                } else {
+                    this.habits = [
+                        {
+                            id: 1,
+                            name: 'Walk around the block',
+                            description: 'Go for a short walk to clear the mind',
+                            color: '#39d353',
+                            theme: 'green',
+                            completions: this.generateSampleData()
+                        },
+                        {
+                            id: 2,
+                            name: 'Learn Norwegian',
+                            description: 'Practice Norwegian language skills',
+                            color: '#a371f7',
+                            theme: 'purple',
+                            completions: this.generateSampleData()
+                        }
+                    ];
+                    this.saveHabits();
+                }
+            }
+
+            generateSampleData() {
+                const completions = {};
+                const now = new Date();
+                const startDate = new Date(now.getFullYear(), 0, 1);
+                
+                for (let d = new Date(startDate); d <= now; d.setDate(d.getDate() + 1)) {
+                    if (Math.random() > 0.7) { // 30% completion rate
+                        completions[d.toISOString().slice(0, 10)] = true;
+                    }
+                }
+                
+                return completions;
+            }
+
+            saveHabits() {
+                localStorage.setItem('habitkit-habits', JSON.stringify(this.habits));
+            }
+
+            toggleHabitCompletion(habitId, date) {
+                const habit = this.habits.find(h => h.id === habitId);
+                if (!habit) return;
+
+                const dateStr = date.toISOString().slice(0, 10);
+                if (habit.completions[dateStr]) {
+                    delete habit.completions[dateStr];
+                } else {
+                    habit.completions[dateStr] = true;
+                }
+                
+                this.saveHabits();
+                this.render();
+            }
+
+            addHabit(name, description, theme) {
+                const themes = {
+                    green: '#39d353',
+                    purple: '#a371f7',
+                    red: '#f85149',
+                    orange: '#ffa657',
+                    blue: '#58a6ff'
+                };
+
+                const habit = {
+                    id: Date.now(),
+                    name,
+                    description,
+                    color: themes[theme] || themes.green,
+                    theme,
+                    completions: {}
+                };
+
+                this.habits.push(habit);
+                this.saveHabits();
+                this.render();
+            }
+
+            deleteHabit(habitId) {
+                const habit = this.habits.find(h => h.id === habitId);
+                if (!habit) return;
+
+                if (confirm(`Are you sure you want to delete "${habit.name}"?`)) {
+                    this.habits = this.habits.filter(h => h.id !== habitId);
+                    this.saveHabits();
+                    this.render();
+                }
+            }
+
+            // GitHub-style heatmap rendering
+            renderHeatmap(habit, isLarge = false) {
+                const container = document.createElement('div');
+                container.className = 'heatmap-container';
+                
+                // Header with title and legend
+                const header = document.createElement('div');
+                header.className = 'heatmap-header';
+                
+                const title = document.createElement('div');
+                title.className = 'heatmap-title';
+                title.textContent = isLarge ? 'One year of activity' : 'Activity overview';
+                
+                const legend = document.createElement('div');
+                legend.className = 'heatmap-legend';
+                
+                const lessText = document.createElement('span');
+                lessText.className = 'legend-text';
+                lessText.textContent = 'Less';
+                
+                const squares = document.createElement('div');
+                squares.className = 'legend-squares';
+                
+                for (let i = 0; i <= 4; i++) {
+                    const square = document.createElement('div');
+                    square.className = `legend-square level-${i}`;
+                    square.style.background = this.getHeatmapColor(i, habit.color);
+                    squares.appendChild(square);
+                }
+                
+                const moreText = document.createElement('span');
+                moreText.className = 'legend-text';
+                moreText.textContent = 'More';
+                
+                legend.appendChild(lessText);
+                legend.appendChild(squares);
+                legend.appendChild(moreText);
+                
+                header.appendChild(title);
+                header.appendChild(legend);
+                container.appendChild(header);
+                
+                // Heatmap wrapper with scrolling
+                const wrapper = document.createElement('div');
+                wrapper.className = 'heatmap-wrapper';
+                
+                const gridContainer = document.createElement('div');
+                gridContainer.className = 'heatmap-grid-container';
+                
+                // Day labels (Mon, Wed, Fri only - like GitHub)
+                const dayLabels = document.createElement('div');
+                dayLabels.className = 'day-labels';
+                
+                const dayNames = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
+                dayNames.forEach(day => {
+                    const label = document.createElement('div');
+                    label.className = 'day-label';
+                    label.textContent = day;
+                    dayLabels.appendChild(label);
+                });
+                
+                // Main heatmap area
+                const mainArea = document.createElement('div');
+                mainArea.className = 'heatmap-main';
+                
+                // Month labels and grid
+                const { monthLabels, grid } = this.createHeatmapGrid(habit);
+                mainArea.appendChild(monthLabels);
+                mainArea.appendChild(grid);
+                
+                gridContainer.appendChild(dayLabels);
+                gridContainer.appendChild(mainArea);
+                wrapper.appendChild(gridContainer);
+                container.appendChild(wrapper);
+                
+                return container;
+            }
+
+            createHeatmapGrid(habit) {
+                const currentYear = new Date().getFullYear();
+                const weeksInYear = this.getWeeksInYear(currentYear);
+                const today = new Date();
+                
+                // Create month labels container
+                const monthLabels = document.createElement('div');
+                monthLabels.className = 'month-labels';
+                
+                // Create grid container
+                const grid = document.createElement('div');
+                grid.className = 'heatmap-grid';
+                
+                // Track month positions for labels
+                const monthPositions = [];
+                let currentMonth = -1;
+                
+                // Generate weeks (columns)
+                for (let week = 0; week < weeksInYear; week++) {
+                    const weekColumn = document.createElement('div');
+                    weekColumn.className = 'week-column';
+                    
+                    let weekWidth = 0;
+                    
+                    // Generate days in week (rows)
+                    for (let day = 0; day < 7; day++) {
+                        const cellDate = this.getDateFromWeekAndDay(week, day, currentYear);
+                        
+                        // Check if we need a month label
+                        if (cellDate.getMonth() !== currentMonth && cellDate <= today) {
+                            currentMonth = cellDate.getMonth();
+                            const monthName = cellDate.toLocaleDateString('en-US', { month: 'short' });
+                            monthPositions.push({ week, monthName, width: 0 });
+                        }
+                        
+                        const cell = document.createElement('div');
+                        cell.className = 'heatmap-cell';
+                        
+                        if (cellDate > today || cellDate.getFullYear() !== currentYear) {
+                            // Future dates or wrong year - make invisible
+                            cell.style.visibility = 'hidden';
+                        } else {
+                            const level = this.getCompletionLevel(habit, cellDate);
+                            cell.classList.add(`level-${level}`);
+                            
+                            // Add click handler
+                            cell.addEventListener('click', () => {
+                                this.toggleHabitCompletion(habit.id, cellDate);
+                            });
+                            
+                            // Add tooltip
+                            cell.addEventListener('mouseenter', (e) => {
+                                this.showTooltip(e.target, cellDate, level > 0, habit);
+                            });
+                            
+                            cell.addEventListener('mouseleave', () => {
+                                this.hideTooltip();
+                            });
+                        }
+                        
+                        weekColumn.appendChild(cell);
+                        weekWidth = Math.max(weekWidth, 13); // 11px cell + 2px for potential borders
+                    }
+                    
+                    grid.appendChild(weekColumn);
+                    
+                    // Update width for current month
+                    if (monthPositions.length > 0) {
+                        monthPositions[monthPositions.length - 1].width += weekWidth;
+                    }
+                }
+                
+                // Add month labels
+                monthPositions.forEach(({ monthName, width }) => {
+                    const label = document.createElement('div');
+                    label.className = 'month-label';
+                    label.textContent = monthName;
+                    label.style.width = `${Math.max(width, 30)}px`; // Minimum width
+                    monthLabels.appendChild(label);
+                });
+                
+                return { monthLabels, grid };
+            }
+
+            getHeatmapColor(level, habitColor) {
+                if (level === 0) return 'var(--heatmap-empty)';
+                
+                // GitHub-style color progression
+                const colors = {
+                    '#39d353': ['#0e4429', '#006d32', '#26a641', '#39d353'],
+                    '#a371f7': ['#1a103d', '#4c2889', '#7c3aed', '#a371f7'],
+                    '#f85149': ['#3d1216', '#7d1814', '#b91c1c', '#f85149'],
+                    '#ffa657': ['#3d1e00', '#7c2d12', '#ea580c', '#ffa657'],
+                    '#58a6ff': ['#0c2a6d', '#1e40af', '#2563eb', '#58a6ff']
+                };
+                
+                const colorArray = colors[habitColor] || colors['#39d353'];
+                return colorArray[level - 1] || colorArray[0];
+            }
+
+            showTooltip(element, date, isCompleted, habit) {
+                const tooltip = document.createElement('div');
+                tooltip.className = 'heatmap-tooltip';
+                
+                const formattedDate = date.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                
+                tooltip.textContent = `${formattedDate} - ${isCompleted ? 'Completed' : 'Not completed'}`;
+                document.body.appendChild(tooltip);
+                
+                const rect = element.getBoundingClientRect();
+                tooltip.style.left = `${rect.left + rect.width / 2}px`;
+                tooltip.style.top = `${rect.top - tooltip.offsetHeight - 10}px`;
+                
+                // Adjust if tooltip goes off screen
+                const tooltipRect = tooltip.getBoundingClientRect();
+                if (tooltipRect.left < 10) {
+                    tooltip.style.left = '10px';
+                    tooltip.style.transform = 'none';
+                } else if (tooltipRect.right > window.innerWidth - 10) {
+                    tooltip.style.left = `${window.innerWidth - tooltipRect.width - 10}px`;
+                    tooltip.style.transform = 'none';
+                }
+                
+                element._tooltip = tooltip;
+            }
+
+            hideTooltip() {
+                const tooltips = document.querySelectorAll('.heatmap-tooltip');
+                tooltips.forEach(tooltip => tooltip.remove());
+            }
+
+            // UI rendering
+            renderDashboard() {
+                const container = document.createElement('div');
+                container.className = 'main-content';
+                
+                // Header
+                const header = document.createElement('header');
+                header.className = 'header';
+                
+                const headerContent = document.createElement('div');
+                headerContent.className = 'header-content';
+                
+                const title = document.createElement('h1');
+                title.textContent = 'HabitKit';
+                
+                const themeToggle = document.createElement('button');
+                themeToggle.className = 'theme-toggle';
+                themeToggle.onclick = () => this.toggleTheme();
+                
+                const icon = document.createElement('span');
+                icon.className = 'icon';
+                icon.textContent = this.isDarkMode ? '☀️' : '🌙';
+                
+                const toggleText = document.createElement('span');
+                toggleText.textContent = this.isDarkMode ? 'Light' : 'Dark';
+                
+                themeToggle.appendChild(icon);
+                themeToggle.appendChild(toggleText);
+                
+                headerContent.appendChild(title);
+                headerContent.appendChild(themeToggle);
+                header.appendChild(headerContent);
+                
+                // Habit form
+                const form = document.createElement('div');
+                form.className = 'habit-form';
+                
+                const formTitle = document.createElement('h3');
+                formTitle.className = 'form-title';
+                formTitle.textContent = 'Add New Habit';
+                
+                const formGrid = document.createElement('div');
+                formGrid.className = 'form-grid';
+                
+                // Name input group
+                const nameGroup = document.createElement('div');
+                nameGroup.className = 'form-group';
+                
+                const nameLabel = document.createElement('label');
+                nameLabel.setAttribute('for', 'habit-name');
+                nameLabel.textContent = 'Habit Name';
+                
+                const nameInput = document.createElement('input');
+                nameInput.type = 'text';
+                nameInput.id = 'habit-name';
+                nameInput.placeholder = 'e.g., Walk around the block';
+                nameInput.required = true;
+                
+                nameGroup.appendChild(nameLabel);
+                nameGroup.appendChild(nameInput);
+                
+                // Theme select group
+                const themeGroup = document.createElement('div');
+                themeGroup.className = 'form-group';
+                
+                const themeLabel = document.createElement('label');
+                themeLabel.setAttribute('for', 'habit-theme');
+                themeLabel.textContent = 'Theme';
+                
+                const themeSelect = document.createElement('select');
+                themeSelect.id = 'habit-theme';
+                
+                const themes = ['green', 'purple', 'red', 'orange', 'blue'];
+                themes.forEach(theme => {
+                    const option = document.createElement('option');
+                    option.value = theme;
+                    option.textContent = theme.charAt(0).toUpperCase() + theme.slice(1);
+                    themeSelect.appendChild(option);
+                });
+                
+                themeGroup.appendChild(themeLabel);
+                themeGroup.appendChild(themeSelect);
+                
+                // Submit button
+                const submitBtn = document.createElement('button');
+                submitBtn.className = 'form-submit';
+                submitBtn.textContent = 'Add Habit';
+                submitBtn.onclick = () => this.handleAddHabit();
+                
+                formGrid.appendChild(nameGroup);
+                formGrid.appendChild(themeGroup);
+                formGrid.appendChild(submitBtn);
+                
+                form.appendChild(formTitle);
+                form.appendChild(formGrid);
+                
+                // Habits grid
+                const habitsGrid = document.createElement('div');
+                habitsGrid.className = 'habits-grid';
+                
+                this.habits.forEach(habit => {
+                    const card = this.renderHabitCard(habit);
+                    habitsGrid.appendChild(card);
+                });
+                
+                container.appendChild(header);
+                container.appendChild(form);
+                container.appendChild(habitsGrid);
+                
+                return container;
+            }
+
+            renderHabitCard(habit) {
+                const card = document.createElement('div');
+                card.className = 'habit-card';
+                card.style.setProperty('--habit-color', habit.color);
+                
+                // Header
+                const header = document.createElement('div');
+                header.className = 'habit-header';
+                
+                const info = document.createElement('div');
+                info.className = 'habit-info';
+                
+                const name = document.createElement('h3');
+                name.className = 'habit-name';
+                name.textContent = habit.name;
+                
+                const description = document.createElement('p');
+                description.className = 'habit-description';
+                description.textContent = habit.description;
+                
+                info.appendChild(name);
+                info.appendChild(description);
+                
+                const actions = document.createElement('div');
+                actions.className = 'habit-actions';
+                
+                const today = new Date().toISOString().slice(0, 10);
+                const completedToday = !!habit.completions[today];
+                
+                const completeBtn = document.createElement('button');
+                completeBtn.className = `action-btn primary ${completedToday ? 'completed' : ''}`;
+                completeBtn.textContent = completedToday ? '✓ Done' : 'Mark Today';
+                completeBtn.onclick = () => this.toggleHabitCompletion(habit.id, new Date());
+                
+                actions.appendChild(completeBtn);
+                
+                header.appendChild(info);
+                header.appendChild(actions);
+                
+                // Heatmap
+                const heatmap = this.renderHeatmap(habit, false);
+                
+                // Delete button
+                const deleteSection = document.createElement('div');
+                deleteSection.className = 'habit-delete-section';
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.innerHTML = '🗑️ Delete';
+                deleteBtn.onclick = () => this.deleteHabit(habit.id);
+                
+                deleteSection.appendChild(deleteBtn);
+                
+                card.appendChild(header);
+                card.appendChild(heatmap);
+                card.appendChild(deleteSection);
+                
+                return card;
+            }
+
+            render() {
+                const root = document.getElementById('root');
+                root.innerHTML = '';
+                
+                const content = this.renderDashboard();
+                root.appendChild(content);
+            }
+
+            // Event handlers
+            handleAddHabit() {
+                const nameInput = document.getElementById('habit-name');
+                const themeSelect = document.getElementById('habit-theme');
+                
+                if (!nameInput || !themeSelect) return;
+                
+                const name = nameInput.value.trim();
+                const theme = themeSelect.value;
+                
+                if (!name) return;
+                
+                this.addHabit(name, `Track your progress with ${name.toLowerCase()}`, theme);
+                
+                nameInput.value = '';
+                themeSelect.value = 'green';
+                nameInput.focus();
+            }
+
+            toggleTheme() {
+                this.isDarkMode = !this.isDarkMode;
+                document.body.classList.toggle('light-mode', !this.isDarkMode);
+                this.render();
+            }
+
+            setupEventListeners() {
+                // Global click handler for tooltips
+                document.addEventListener('click', (e) => {
+                    if (!e.target.classList.contains('heatmap-cell')) {
+                        this.hideTooltip();
+                    }
+                });
+
+                // Handle form submission with Enter key
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && e.target.id === 'habit-name') {
+                        this.handleAddHabit();
+                    }
+                });
+            }
+        }
+
+        // Initialize the app
+        const app = new HabitKit();
+    </script>
+</body>
+</html>
